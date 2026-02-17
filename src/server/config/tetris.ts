@@ -15,7 +15,7 @@ export const BOARD_WALL_BLOCK_ID = 15;
 /** Wall frame: thickness in grid units for left/right sides. Larger = pillars extend further left/right. */
 export const WALL_THICKNESS = 5;
 /** Left/right walls extend this many blocks in the horizontal X direction (left wall extends to -WALL_SIDE_X, right to BOARD_WIDTH + WALL_SIDE_X - 1). */
-export const WALL_SIDE_X = 20;
+export const WALL_SIDE_X = 3;
 /** Bottom "floor" and top "ceiling" thickness in grid units. Larger = clearly visible base and cap. */
 export const WALL_BOTTOM_THICKNESS = 4;
 export const WALL_TOP_THICKNESS = 3;
