@@ -59,7 +59,7 @@ function gridToWorld(gx: number, gy: number): { x: number; y: number; z: number 
   };
 }
 
-/** Valid block IDs we may write (0 = air; others from config). */
+/** Valid block IDs we may write (0 = air; others from config). Torches are entities, not blocks. */
 const VALID_BLOCK_IDS = new Set([0, 1, 2, 3, 4, 5, 6, 7, BOARD_WALL_BLOCK_ID]);
 
 /**
@@ -84,7 +84,7 @@ export function render(state: TetrisState, world: World): void {
     }
   }
 
-  // Solid boundary: always draw the inner frame at the board plane so the play area is clearly visible.
+  // Solid boundary: inner frame at the board plane (all oak). Torches are spawned as entities in index.ts.
   for (let y = 0; y < BOARD_HEIGHT; y++) {
     desired.set(cellKey(-1, y), BOARD_WALL_BLOCK_ID);
     desired.set(cellKey(BOARD_WIDTH, y), BOARD_WALL_BLOCK_ID);

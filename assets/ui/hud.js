@@ -45,35 +45,9 @@
     rowsEl.innerHTML = html;
   }
 
-  function getBestFromLeaderboard(leaderboard, currentScore) {
-    var best = currentScore != null ? currentScore : 0;
-    if (leaderboard && Array.isArray(leaderboard.rows) && leaderboard.selfPlayerId != null) {
-      for (var i = 0; i < leaderboard.rows.length; i++) {
-        if (String(leaderboard.rows[i].playerId) === String(leaderboard.selfPlayerId)) {
-          var rowScore = leaderboard.rows[i].score != null ? Number(leaderboard.rows[i].score) : 0;
-          if (rowScore > best) best = rowScore;
-          break;
-        }
-      }
-    }
-    return best;
-  }
-
-  var lastGameOverScore = 0;
-  function updateGameOverBest(leaderboard, currentScore) {
-    var overlay = document.getElementById('game-over-overlay');
-    if (!overlay || !overlay.classList.contains('visible')) return;
-    var bestEl = document.getElementById('game-over-best');
-    var score = currentScore != null ? currentScore : lastGameOverScore;
-    if (bestEl) bestEl.textContent = getBestFromLeaderboard(leaderboard, score);
-  }
-
   function updateUI(data) {
     const el = function id(name) { return document.getElementById(name); };
-    if (data.leaderboard !== undefined) {
-      updateLeaderboard(data.leaderboard);
-      updateGameOverBest(data.leaderboard, data.score);
-    }
+    if (data.leaderboard !== undefined) updateLeaderboard(data.leaderboard);
     if (data.score !== undefined) { var s = el('score'); if (s) s.textContent = data.score; }
     if (data.level !== undefined) { var l = el('level'); if (l) l.textContent = data.level; }
     if (data.lines !== undefined) { var n = el('lines'); if (n) n.textContent = data.lines; }
@@ -92,11 +66,8 @@
         if (data.status === 'GAME_OVER') {
           var scoreEl = document.getElementById('game-over-score');
           var linesEl = document.getElementById('game-over-lines');
-          var bestEl = document.getElementById('game-over-best');
-          lastGameOverScore = data.score != null ? data.score : 0;
-          if (scoreEl) scoreEl.textContent = lastGameOverScore;
+          if (scoreEl) scoreEl.textContent = data.score != null ? data.score : 0;
           if (linesEl) linesEl.textContent = data.lines != null ? data.lines : 0;
-          if (bestEl) bestEl.textContent = getBestFromLeaderboard(data.leaderboard, lastGameOverScore);
           overlay.classList.add('visible');
           overlay.setAttribute('aria-hidden', 'false');
         } else {

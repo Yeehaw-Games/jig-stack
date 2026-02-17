@@ -4,6 +4,8 @@
  */
 
 import 'dotenv/config';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { logLeaderboardEnvStatus, checkSupabaseConnectivity } from './src/server/config/leaderboard.js';
 import {
   startServer,
@@ -15,7 +17,7 @@ import {
   PlayerUIEvent,
   RigidBodyType,
 } from 'hytopia';
-import type { World } from 'hytopia';
+import type { World, WorldMap } from 'hytopia';
 import { createInitialState } from './src/server/state/WorldState.js';
 import type { TetrisState } from './src/server/state/types.js';
 import { runTick } from './src/server/systems/GameLoop.js';
@@ -53,10 +55,22 @@ function placeSpawnPlatform(world: World): void {
   }
 }
 
+/** Path to the arena map (loaded so the room is not empty). */
+const MAP_PATH = join(process.cwd(), 'assets', 'map.json');
+
 startServer((world: World) => {
   const state: TetrisState = createInitialState();
   let controllerPlayerId: string | null = null;
   let prevGameStatus: typeof state.gameStatus = state.gameStatus;
+
+  // Load arena map first (floor, walls, stage, etc.); then we override block types 1–7, 8, 15 for Tetris/floor/wall
+  try {
+    const mapJson = readFileSync(MAP_PATH, 'utf-8');
+    const map = JSON.parse(mapJson) as WorldMap;
+    world.loadMap(map);
+  } catch (err) {
+    console.warn('Tetris: could not load assets/map.json:', (err as Error).message);
+  }
 
   // Register block types before world.start() so chunk/world logic never sees unregistered IDs
   for (let id = 1; id <= 7; id++) {
@@ -74,13 +88,14 @@ startServer((world: World) => {
   world.blockTypeRegistry.registerGenericBlockType({
     id: BOARD_WALL_BLOCK_ID,
     name: 'wall',
-    textureUri: 'blocks/stone.png',
+    textureUri: 'blocks/oak-log', // board frame = oak (multi-texture)
   });
 
   world.start();
 
   logLeaderboardEnvStatus();
   checkSupabaseConnectivity().catch(() => {});
+
   startLeaderboardBroadcastInterval(world);
 
   const SOUNDTRACK_URI = 'audio/game-over.mp3';

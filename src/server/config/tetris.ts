@@ -9,8 +9,8 @@ export const BOARD_HEIGHT = 20;
 /** World origin for the board: first cell (0,0) maps to this world position. */
 export const BOARD_ORIGIN = { x: 0, y: 0, z: 0 };
 
-/** Block type id for the visible board boundary (walls). Must exist in map blockTypes (e.g. stone = 15). */
-export const BOARD_WALL_BLOCK_ID = 15;
+/** Block type id for the visible board boundary (walls). Oak-log for a warmer frame. */
+export const BOARD_WALL_BLOCK_ID = 11;
 
 /** Wall frame: thickness in grid units for left/right sides. Larger = pillars extend further left/right. */
 export const WALL_THICKNESS = 5;

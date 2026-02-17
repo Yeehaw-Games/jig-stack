@@ -214,7 +214,7 @@ body {
   background: rgba(50, 200, 90, 0.95);
 }
 
-/* ——— Leaderboard panel (right side, always visible) ——— */
+/* ——— Leaderboard panel (top-right; also shown in-world on monitor when SceneUI loads) ——— */
 .leaderboard-panel {
   position: fixed;
   right: 12px;
@@ -322,6 +322,64 @@ body {
   text-align: center;
   font-size: 0.85rem;
   opacity: 0.8;
+}
+
+/* ——— In-world SceneUI leaderboard (monitor on right wall) ——— */
+.scene-ui-leaderboard {
+  padding: 12px 14px;
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.scene-ui-leaderboard .leaderboard-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  opacity: 0.95;
+  margin-bottom: 0;
+}
+
+.scene-ui-leaderboard .leaderboard-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.scene-ui-leaderboard .leaderboard-rows {
+  overflow-y: auto;
+  max-height: 180px;
+}
+
+.scene-ui-leaderboard .leaderboard-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 56px;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.scene-ui-leaderboard .leaderboard-row:last-child {
+  border-bottom: none;
+}
+
+.scene-ui-leaderboard .leaderboard-empty {
+  padding: 8px 0;
+  font-size: 0.8rem;
 }
 
 @media (min-width: 600px) {
