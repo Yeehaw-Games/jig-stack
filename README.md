@@ -73,3 +73,4 @@ The game includes a **global persistent leaderboard** shown in a HUD panel on th
 3. **Install dependencies**: `npm install` (adds `@supabase/supabase-js`).
 
 4. Restart the server; the leaderboard panel will show **Online** when Supabase is reachable, or **Offline** if the DB is unavailable (gameplay continues). Scores are submitted only on game over (server-authoritative) and only when the run beats the player’s previous best.
+# jig-stack
