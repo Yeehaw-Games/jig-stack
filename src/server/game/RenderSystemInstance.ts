@@ -1,21 +1,18 @@
 /**
- * Per-instance rendering: one cache per plot, render at arbitrary origin, clear only that plot's region.
+ * Per-instance rendering: one cache per plot, render at arbitrary origin, clear only boardBounds.
+ * Reactor Arcade shell (platform/backdrop/columns) is built once and never cleared; no procedural walls.
  */
 
 import type { World } from 'hytopia';
-import { BOARD_WIDTH, BOARD_HEIGHT, BOARD_WALL_BLOCK_ID, PIECE_TYPE_TO_BLOCK_ID } from '../config/tetris.js';
+import { BOARD_WIDTH, BOARD_HEIGHT, BOARD_RENDER_HEIGHT, BOARD_WALL_BLOCK_ID, PIECE_TYPE_TO_BLOCK_ID } from '../config/tetris.js';
 import type { TetrisState } from '../state/types.js';
 import { getPieceCells } from '../systems/TetrisSystem.js';
-import { getWallLayout, wallCellToWorld } from '../world/WallGenerator.js';
 import type { Plot } from '../plots/PlotManager.js';
 
 const RENDER_FULL_REDRAW = true;
 
 function cellKey(x: number, y: number): string {
   return `${x},${y}`;
-}
-function wallPosKey(x: number, y: number, z: number): string {
-  return `${x},${y},${z}`;
 }
 
 interface InstanceCache {
@@ -75,7 +72,7 @@ export function renderInstance(
   const cache = getCache(plotId);
   const desired = new Map<string, number>();
   const width = state.board[0].length;
-  const height = state.board.length;
+  const height = BOARD_RENDER_HEIGHT;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -85,24 +82,13 @@ export function renderInstance(
     }
   }
 
-  const wallSeed = state.seed ?? state.rngState ?? 0;
-  const wallCells = getWallLayout(wallSeed);
+  // Reactor Arcade: no procedural walls (shell is built once by ReactorArcade).
   const newWallKeys = new Set<string>();
-  for (const cell of wallCells) {
-    const pos = wallCellToWorld(cell, origin);
-    newWallKeys.add(wallPosKey(pos.x, pos.y, pos.z));
-  }
   for (const key of cache.lastRenderedWall) {
     if (!newWallKeys.has(key)) {
       const [x, y, z] = key.split(',').map(Number);
       world.chunkLattice.setBlock({ x, y, z }, 0);
     }
-  }
-  for (const cell of wallCells) {
-    const pos = wallCellToWorld(cell, origin);
-    const key = wallPosKey(pos.x, pos.y, pos.z);
-    world.chunkLattice.setBlock(pos, BOARD_WALL_BLOCK_ID);
-    newWallKeys.add(key);
   }
   cache.lastRenderedWall = newWallKeys;
 
@@ -132,10 +118,11 @@ export function clearInstanceRenderCache(world: World, plot: Plot): void {
 }
 
 /**
- * Set all blocks in the plot's bounding box to air. Does not touch other plots or shared arena.
+ * Set all blocks in the plot's board bounds to air. Only clears boardBounds (active board area).
+ * Shell geometry (platform, backdrop, beams) is never cleared.
  */
 export function clearPlotRegion(world: World, plot: Plot): void {
-  const { minX, maxX, minY, maxY, minZ, maxZ } = plot.bounds;
+  const { minX, maxX, minY, maxY, minZ, maxZ } = plot.boardBounds;
   for (let x = minX; x <= maxX; x++) {
     for (let y = minY; y <= maxY; y++) {
       for (let z = minZ; z <= maxZ; z++) {

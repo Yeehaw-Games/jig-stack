@@ -26,4 +26,6 @@ export interface HudPayload {
   gameStarted: boolean;
   /** When present, client updates the leaderboard panel. */
   leaderboard?: LeaderboardPayload;
+  /** Optional raw server status for NO_PLOT / ASSIGNING_PLOT messages. */
+  serverStatus?: string;
 }

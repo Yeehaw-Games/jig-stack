@@ -14,31 +14,64 @@
         <div class="game-over-stats">
           <div class="game-over-stat"><span class="label">Score</span><span id="game-over-score">0</span></div>
           <div class="game-over-stat"><span class="label">Lines</span><span id="game-over-lines">0</span></div>
+          <div class="game-over-stat"><span class="label">Best score</span><span id="game-over-best">0</span></div>
         </div>
         <button type="button" class="btn btn-new-game" id="btn-new-game" data-action="reset" aria-label="Start new game">Start New Game</button>
       </div>
     </div>
+    <!-- Dedicated audio controls HUD (separate from leaderboard so input/events work reliably) -->
+    <div class="audio-controls-panel" id="audio-controls-panel" aria-label="Sound controls">
+      <div class="audio-controls-title">Sound</div>
+      <div class="audio-controls-buttons">
+        <button type="button" class="btn btn-mute" id="btn-mute-music" aria-label="Mute music" title="Mute music">🎵 Music</button>
+        <button type="button" class="btn btn-mute" id="btn-mute-sfx" aria-label="Mute SFX" title="Mute sound effects">🔊 SFX</button>
+      </div>
+    </div>
+
     <div class="leaderboard-panel" id="leaderboard-panel" aria-label="Global leaderboard">
-      <div class="leaderboard-title">LEADERBOARD</div>
+      <div class="leaderboard-header">
+        <div class="leaderboard-title">LEADERBOARD</div>
+      </div>
       <div class="leaderboard-meta">
         <span class="leaderboard-scope">Global</span>
         <span class="leaderboard-status" id="leaderboard-status">—</span>
       </div>
       <div class="leaderboard-rows" id="leaderboard-rows"></div>
     </div>
-    <div class="top">
-      <div class="stats">
-        <div class="stat"><span class="label">Score</span><span id="score">0</span></div>
-        <div class="stat"><span class="label">Level</span><span id="level">1</span></div>
-        <div class="stat"><span class="label">Lines</span><span id="lines">0</span></div>
-        <div class="stat status" id="stat-status" aria-hidden="true"><span id="status">-</span></div>
+    <div class="top" id="solo-top">
+      <div class="hud-center">
+        <div class="stats" id="score-bar-container">
+          <div class="stat"><span class="label">Score</span><span id="score" data-prev="0">0</span></div>
+          <div class="stat"><span class="label">Level</span><span id="level" data-prev="1">1</span></div>
+          <div class="stat"><span class="label">Lines</span><span id="lines" data-prev="0">0</span></div>
+        </div>
+        <div class="start-restart-row">
+          <button type="button" class="btn btn-start-restart" id="btn-start-restart" data-action="start" aria-label="Start game">Start</button>
+        </div>
       </div>
-      <p class="hint" id="hint">Click <strong>Start</strong> to begin the round. Then WASD or arrows move pieces (A/← left, D/→ right, W/↑ rotate, S/↓ soft drop). Space hard drop. R or Reset to restart.</p>
-      <div class="start-area" id="start-area">
-        <button type="button" class="btn start" id="btn-start" data-action="start" aria-label="Start game">Start</button>
+      <p class="hint hint-server-only hidden" id="hint-server-message"></p>
+    </div>
+
+    <!-- Right column: next piece + controls, stacked under leaderboard -->
+    <div class="hud-right-stack">
+      <div class="next-preview-panel" id="next-preview-container" aria-label="Next piece">
+        <div class="next-preview-title">NEXT</div>
+        <div class="next-preview-grid" id="next-preview-grid"></div>
+      </div>
+      <div class="controls-panel-right" id="controls-panel-right" aria-label="How to play">
+        <div class="controls-panel-title">How to play</div>
+        <div class="controls-panel-keys">
+          <span class="controls-key"><kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> Move</span>
+          <span class="controls-key"><kbd>W</kbd> or <kbd>↑</kbd> Rotate</span>
+          <span class="controls-key"><kbd>S</kbd> or <kbd>↓</kbd> Soft drop</span>
+          <span class="controls-key"><kbd>Space</kbd> Hard drop</span>
+          <span class="controls-key"><kbd>R</kbd> Restart</span>
+        </div>
       </div>
     </div>
   </div>
+  <script src="{{CDN_ASSETS_URL}}/ui/components/ScoreBar.js"></script>
+  <script src="{{CDN_ASSETS_URL}}/ui/components/NextPreview.js"></script>
   <script src="{{CDN_ASSETS_URL}}/ui/hud.js"></script>
 </body>
 </html>

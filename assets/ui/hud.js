@@ -2,9 +2,105 @@
  * Tetris HUD client: receives server state, sends actions (left, right, rotate, softDrop, hardDrop, reset).
  * Soft drop: mousedown/touchstart -> softDropDown, mouseup/touchend -> softDropUp.
  * Keyboard: Arrow keys or WASD (A left, D right, W rotate, S soft drop), Space hard drop, R reset.
+ * Music: played from UI via HTML5 Audio so mute button can pause it (engine has no per-player mute API).
  */
 
 (function () {
+  var SCORE_BURST_DURATION_MS = 900;
+  var SCREEN_SHAKE_DURATION_MS = 300;
+
+  // Resolve assets base URL from this script's src (e.g. .../assets/ui/hud.js -> .../assets)
+  var scriptEl = document.currentScript;
+  var scriptSrc = scriptEl ? scriptEl.src : '';
+  var assetsBase = scriptSrc.replace(/\/ui\/hud\.js(\?.*)?$/i, '');
+  /** One-shot sound when game ends (play only on transition to GAME_OVER). */
+  var gameOverSoundUrl = assetsBase ? assetsBase + '/audio/game-over.mp3' : '';
+  /** Voice line after game-over sound. */
+  var gameOverVoiceUrl = assetsBase ? assetsBase + '/audio/game-over-voice.mp3' : '';
+  /** Jig stacked clip after game-over voice. */
+  var jigStackedUrl = assetsBase ? assetsBase + '/audio/jig-stacked.mp3' : '';
+  /** In-game looping background music (play only when status is RUNNING). */
+  var soundtrackUrl = assetsBase ? assetsBase + '/audio/soundtrack.mp3' : '';
+  var lineClearSoundUrl = assetsBase ? assetsBase + '/audio/line-clear.mp3' : '';
+  /** One-shot when player clears exactly 2 lines. */
+  var break2LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-2-lines.mp3' : '';
+  /** One-shot when player clears exactly 3 lines. */
+  var break3LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-3-lines.mp3' : '';
+  /** One-shot when player clears exactly 4 lines (Tetris). */
+  var break4LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-4-lines.mp3' : '';
+  /** One-shot when piece locks (lands). */
+  var blockLandSoundUrl = assetsBase ? assetsBase + '/audio/block-land.mp3' : '';
+  var buttonClickSoundUrl = assetsBase ? assetsBase + '/audio/button-click.mp3' : '';
+  /** One-shot sound when player levels up. */
+  var levelUpSoundUrl = assetsBase ? assetsBase + '/audio/level-up.mp3' : '';
+  /** Trim start of button click (seconds) to skip silent lead-in. */
+  var buttonClickTrimStart = 0.35;
+
+  /** Last level we saw (to play level-up sound only when level increases). */
+  var lastLevel = undefined;
+
+  var soundtrackEl = null;
+  function getSoundtrack() {
+    if (soundtrackEl) return soundtrackEl;
+    if (!soundtrackUrl) return null;
+    var audio = new window.Audio(soundtrackUrl);
+    audio.loop = true;
+    audio.volume = 0.5;
+    soundtrackEl = audio;
+    return audio;
+  }
+
+  var lastAppliedMusicMuted = undefined;
+  var lastAppliedSfxMuted = undefined;
+  /** Last normalized status (gameover = play game-over sound once). */
+  var lastStatus = '';
+  /** Current SFX muted state (for future SFX: check before playing). */
+  window.__tetrisSfxMuted = false;
+
+  function setMusicMuted(muted) {
+    var st = getSoundtrack();
+    if (!st) return;
+    if (muted) {
+      st.pause();
+    }
+    /* When unmuted, playback is started only when status is RUNNING (see applySoundtrackForStatus). */
+  }
+
+  /** Play game-over sequence: game-over sound → game-over voice → jig stacked (respects SFX mute). */
+  function playGameOverSound() {
+    if (window.__tetrisSfxMuted || !gameOverSoundUrl) return;
+    var gameOver = new window.Audio(gameOverSoundUrl);
+    gameOver.volume = 0.6;
+    gameOver.play().catch(function () {});
+    gameOver.addEventListener('ended', function onGameOverEnded() {
+      gameOver.removeEventListener('ended', onGameOverEnded);
+      if (window.__tetrisSfxMuted || !gameOverVoiceUrl) return;
+      var voice = new window.Audio(gameOverVoiceUrl);
+      voice.volume = 0.6;
+      voice.play().catch(function () {});
+      voice.addEventListener('ended', function onVoiceEnded() {
+        voice.removeEventListener('ended', onVoiceEnded);
+        if (window.__tetrisSfxMuted || !jigStackedUrl) return;
+        var jig = new window.Audio(jigStackedUrl);
+        jig.volume = 0.6;
+        jig.play().catch(function () {});
+      });
+    });
+  }
+
+  /** Start or stop soundtrack based on status and mute. Plays when game is running (accepts 'playing' or 'RUNNING'). */
+  function applySoundtrackForStatus(status, musicMuted) {
+    var st = getSoundtrack();
+    if (!st) return;
+    var isPlaying = status === 'playing' || status === 'RUNNING';
+    if (isPlaying && !musicMuted) {
+      st.volume = 0.5;
+      st.play().catch(function () {});
+    } else {
+      st.pause();
+    }
+  }
+
   function send(action) {
     if (typeof hytopia !== 'undefined' && hytopia.sendData) {
       hytopia.sendData({ action });
@@ -45,69 +141,169 @@
     rowsEl.innerHTML = html;
   }
 
+  function playLineClearSound(lines) {
+    var url = lineClearSoundUrl;
+    if (lines === 2 && break2LinesSoundUrl) url = break2LinesSoundUrl;
+    else if (lines === 3 && break3LinesSoundUrl) url = break3LinesSoundUrl;
+    else if (lines === 4 && break4LinesSoundUrl) url = break4LinesSoundUrl;
+    if (window.__tetrisSfxMuted || !url) return;
+    var audio = new window.Audio(url);
+    audio.volume = 0.6;
+    audio.play().catch(function () {});
+  }
+
+  function playBlockLandSound() {
+    if (window.__tetrisSfxMuted || !blockLandSoundUrl) return;
+    var audio = new window.Audio(blockLandSoundUrl);
+    audio.volume = 0.6;
+    audio.play().catch(function () {});
+  }
+
+  function playButtonClickSound() {
+    if (window.__tetrisSfxMuted || !buttonClickSoundUrl) return;
+    var audio = new window.Audio(buttonClickSoundUrl);
+    audio.volume = 0.6;
+    audio.currentTime = buttonClickTrimStart;
+    audio.play().catch(function () {});
+  }
+
+  function playLevelUpSound() {
+    if (window.__tetrisSfxMuted || !levelUpSoundUrl) return;
+    var audio = new window.Audio(levelUpSoundUrl);
+    audio.volume = 0.6;
+    audio.play().catch(function () {});
+  }
+
+  function showScoreBurst(points, lines) {
+    if (lines > 0) playLineClearSound(lines);
+    var el = document.createElement('div');
+    el.className = 'score-burst';
+    el.textContent = '+' + points;
+    if (lines === 4) {
+      el.classList.add('tetris-burst');
+    } else if (lines === 3) {
+      el.classList.add('triple-burst');
+    }
+    document.body.appendChild(el);
+    setTimeout(function () {
+      el.remove();
+    }, SCORE_BURST_DURATION_MS);
+    if (lines >= 3) {
+      document.body.classList.add('screen-shake');
+      setTimeout(function () {
+        document.body.classList.remove('screen-shake');
+      }, SCREEN_SHAKE_DURATION_MS);
+    }
+  }
+
   function updateUI(data) {
     const el = function id(name) { return document.getElementById(name); };
+    if (data.type === 'lineClearBurst') {
+      showScoreBurst(data.points, data.linesCleared);
+      /* Fall through so merged payloads still update score/level/lines */
+    }
+    if (data.type === 'pieceLock') {
+      playBlockLandSound();
+      return;
+    }
     if (data.leaderboard !== undefined) updateLeaderboard(data.leaderboard);
-    if (data.score !== undefined) { var s = el('score'); if (s) s.textContent = data.score; }
-    if (data.level !== undefined) { var l = el('level'); if (l) l.textContent = data.level; }
-    if (data.lines !== undefined) { var n = el('lines'); if (n) n.textContent = data.lines; }
+    if (data.musicMuted !== undefined) {
+      var muteBtn = el('btn-mute-music');
+      if (muteBtn) {
+        muteBtn.classList.toggle('muted', data.musicMuted);
+        muteBtn.setAttribute('aria-label', data.musicMuted ? 'Unmute music' : 'Mute music');
+        muteBtn.title = data.musicMuted ? 'Unmute music' : 'Mute music';
+        muteBtn.textContent = (data.musicMuted ? '\uD83D\uDD07' : '\uD83C\uDFB5') + ' Music';
+      }
+      if (data.musicMuted !== lastAppliedMusicMuted) {
+        lastAppliedMusicMuted = data.musicMuted;
+        setMusicMuted(data.musicMuted);
+        applySoundtrackForStatus(lastStatus, data.musicMuted);
+      }
+    }
+    if (data.sfxMuted !== undefined) {
+      lastAppliedSfxMuted = data.sfxMuted;
+      window.__tetrisSfxMuted = data.sfxMuted;
+      var sfxBtn = el('btn-mute-sfx');
+      if (sfxBtn) {
+        sfxBtn.classList.toggle('muted', data.sfxMuted);
+        sfxBtn.setAttribute('aria-label', data.sfxMuted ? 'Unmute SFX' : 'Mute SFX');
+        sfxBtn.title = data.sfxMuted ? 'Unmute sound effects' : 'Mute sound effects';
+        sfxBtn.textContent = (data.sfxMuted ? '\uD83D\uDD07' : '\uD83D\uDD0A') + ' SFX';
+      }
+    }
+    // ——— ScoreBar component: score, level, lines + animation hooks ———
+    var ScoreBar = window.TetrisHudComponents && window.TetrisHudComponents.ScoreBar;
+    if (ScoreBar && (data.score !== undefined || data.level !== undefined || data.lines !== undefined)) {
+      var changes = ScoreBar.update({ score: data.score, level: data.level, lines: data.lines });
+      if (data.level !== undefined && lastLevel !== undefined && data.level > lastLevel) playLevelUpSound();
+      if (data.level !== undefined) lastLevel = data.level;
+      ScoreBar.applyAnimationClasses(changes);
+    } else {
+      if (data.score !== undefined) { var s = el('score'); if (s) s.textContent = data.score; }
+      if (data.level !== undefined) {
+        var l = el('level');
+        if (l) l.textContent = data.level;
+        if (lastLevel !== undefined && data.level > lastLevel) playLevelUpSound();
+        lastLevel = data.level;
+      }
+      if (data.lines !== undefined) { var n = el('lines'); if (n) n.textContent = data.lines; }
+    }
+
+    // ——— Normalized status: gameover overlay, soundtrack, controls-hud visibility ———
+    // Server sends RUNNING | GAME_OVER | ASSIGNING_PLOT | NO_PLOT; client uses playing | gameover | waiting
     if (data.status !== undefined) {
-      var statusEl = el('status');
-      var statusStat = statusEl && statusEl.closest('.stat.status');
-      if (statusEl) {
-        statusEl.textContent = data.status;
-        statusEl.setAttribute('data-status', data.status);
-      }
-      if (statusStat) {
-        statusStat.style.display = 'none';
-      }
+      var raw = data.status;
+      var status = raw === 'RUNNING' ? 'playing' : (raw === 'GAME_OVER' ? 'gameover' : (raw === 'ASSIGNING_PLOT' || raw === 'NO_PLOT' ? 'waiting' : raw));
       var overlay = document.getElementById('game-over-overlay');
       if (overlay) {
-        if (data.status === 'GAME_OVER') {
+        if (status === 'gameover') {
           var scoreEl = document.getElementById('game-over-score');
           var linesEl = document.getElementById('game-over-lines');
           if (scoreEl) scoreEl.textContent = data.score != null ? data.score : 0;
           if (linesEl) linesEl.textContent = data.lines != null ? data.lines : 0;
           overlay.classList.add('visible');
           overlay.setAttribute('aria-hidden', 'false');
+          if (lastStatus !== 'gameover') playGameOverSound();
         } else {
           overlay.classList.remove('visible');
           overlay.setAttribute('aria-hidden', 'true');
         }
       }
+      applySoundtrackForStatus(status, lastAppliedMusicMuted === true);
+      lastStatus = status;
     }
-    if (data.gameStarted !== undefined || data.status !== undefined) {
-      var startArea = document.getElementById('start-area');
-      var hint = document.getElementById('hint');
-      var status = data.status || '';
-      if (status === 'NO_PLOT') {
-        if (startArea) startArea.style.display = '';
-        if (hint) hint.textContent = 'All plots full. Wait for a free plot.';
-        var startBtn = document.getElementById('btn-start');
-        if (startBtn) startBtn.style.display = 'none';
-      } else if (status === 'ASSIGNING_PLOT') {
-        if (startArea) startArea.style.display = '';
-        if (hint) hint.textContent = 'Assigning plot…';
-        var startBtn2 = document.getElementById('btn-start');
-        if (startBtn2) startBtn2.style.display = 'none';
-      } else if (data.gameStarted) {
-        if (startArea) startArea.style.display = 'none';
-        if (hint) hint.textContent = 'WASD or arrows: A/← left, D/→ right, W/↑ rotate, S/↓ soft drop. Space hard drop. R or Reset to restart.';
-        var startBtn3 = document.getElementById('btn-start');
-        if (startBtn3) startBtn3.style.display = '';
-      } else {
-        if (startArea) startArea.style.display = '';
-        if (hint) hint.textContent = 'Click Start to begin the round.';
-        var startBtn4 = document.getElementById('btn-start');
-        if (startBtn4) startBtn4.style.display = '';
-      }
+
+    // ——— Start button: show only when game has not been started (gameStarted is the only source of truth; server sends RUNNING even before start). ———
+    var serverStatus = data.serverStatus;
+    var startRow = document.querySelector('.start-restart-row');
+    var startRestartBtn = document.getElementById('btn-start-restart');
+    if (startRow && startRestartBtn) {
+      startRestartBtn.textContent = 'Start';
+      startRestartBtn.setAttribute('data-action', 'start');
+      startRestartBtn.setAttribute('aria-label', 'Start game');
+      var gameStarted = data.gameStarted === true;
+      var hideStartRow = gameStarted || serverStatus === 'NO_PLOT' || serverStatus === 'ASSIGNING_PLOT';
+      if (hideStartRow) startRow.classList.add('hidden'); else startRow.classList.remove('hidden');
     }
+
+    // ——— Server-only hint (NO_PLOT / ASSIGNING_PLOT). ———
+    var hintEl = document.getElementById('hint-server-message');
+    if (serverStatus === 'NO_PLOT') {
+      if (hintEl) { hintEl.textContent = 'All plots full. Wait for a free plot.'; hintEl.classList.remove('hidden'); }
+    } else if (serverStatus === 'ASSIGNING_PLOT') {
+      if (hintEl) { hintEl.textContent = 'Assigning plot…'; hintEl.classList.remove('hidden'); }
+    } else if (hintEl) {
+      hintEl.classList.add('hidden');
+    }
+
+    // ——— Next piece preview (right side under leaderboard). Update whenever we have payload so the piece or empty grid renders. ———
+    var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
+    if (NextPreview) NextPreview.update(data.nextPiece);
   }
 
   if (typeof hytopia !== 'undefined' && hytopia.onData) {
-    hytopia.onData(function (data) {
-      updateUI(data);
-    });
+    hytopia.onData(updateUI);
   }
 
   var buttons = document.querySelectorAll('.btn[data-action]');
@@ -118,6 +314,7 @@
 
     btn.addEventListener('mousedown', function (e) {
       e.preventDefault();
+      playButtonClickSound();
       var a = this.getAttribute('data-action');
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
@@ -136,6 +333,7 @@
     });
     btn.addEventListener('touchstart', function (e) {
       e.preventDefault();
+      playButtonClickSound();
       var a = this.getAttribute('data-action');
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
@@ -149,6 +347,54 @@
     }, { passive: false });
   }
 
+  // ——— Mute buttons: optimistic local toggle + notify server (event delegation so they work in any load order) ———
+  function applyMuteButtonUi(btn, muted, isMusic) {
+    if (!btn) return;
+    btn.classList.toggle('muted', muted);
+    if (isMusic) {
+      btn.setAttribute('aria-label', muted ? 'Unmute music' : 'Mute music');
+      btn.title = muted ? 'Unmute music' : 'Mute music';
+      btn.textContent = (muted ? '\uD83D\uDD07' : '\uD83C\uDFB5') + ' Music';
+    } else {
+      btn.setAttribute('aria-label', muted ? 'Unmute SFX' : 'Mute SFX');
+      btn.title = muted ? 'Unmute sound effects' : 'Mute sound effects';
+      btn.textContent = (muted ? '\uD83D\uDD07' : '\uD83D\uDD0A') + ' SFX';
+    }
+  }
+
+  function handleMuteButton(btn) {
+    if (!btn || !btn.id) return;
+    if (btn.id === 'btn-mute-music') {
+      playButtonClickSound();
+      if (lastAppliedMusicMuted === undefined) lastAppliedMusicMuted = false;
+      lastAppliedMusicMuted = !lastAppliedMusicMuted;
+      applyMuteButtonUi(btn, lastAppliedMusicMuted, true);
+      setMusicMuted(lastAppliedMusicMuted);
+      applySoundtrackForStatus(lastStatus, lastAppliedMusicMuted);
+      send('toggleMusicMute');
+    } else if (btn.id === 'btn-mute-sfx') {
+      playButtonClickSound();
+      if (lastAppliedSfxMuted === undefined) lastAppliedSfxMuted = false;
+      lastAppliedSfxMuted = !lastAppliedSfxMuted;
+      window.__tetrisSfxMuted = lastAppliedSfxMuted;
+      applyMuteButtonUi(btn, lastAppliedSfxMuted, false);
+      send('toggleSfxMute');
+    }
+  }
+
+  function onMutePointerDown(e) {
+    var target = e.target;
+    var btn = target && target.id && (target.id === 'btn-mute-music' || target.id === 'btn-mute-sfx') ? target : (target && target.closest ? target.closest('#btn-mute-music, #btn-mute-sfx') : null);
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleMuteButton(btn);
+    }
+  }
+
+  document.addEventListener('mousedown', onMutePointerDown, true);
+  document.addEventListener('touchstart', onMutePointerDown, { capture: true, passive: false });
+
   document.addEventListener('keydown', function (e) {
     var key = e.key;
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') { send('left'); e.preventDefault(); }
@@ -156,6 +402,7 @@
     if (key === 'ArrowUp' || key === 'w' || key === 'W') { send('rotate'); e.preventDefault(); }
     if (key === 'ArrowDown' || key === 's' || key === 'S') { send('softDropDown'); e.preventDefault(); _softDropKey = true; }
     if (key === ' ') { send('hardDrop'); e.preventDefault(); }
+    if (key === 'e' || key === 'E') { send('usePowerUp'); e.preventDefault(); }
     if (key === 'r' || key === 'R') { send('reset'); e.preventDefault(); }
   });
   document.addEventListener('keyup', function (e) {

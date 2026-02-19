@@ -10,15 +10,18 @@ import type { TetrisState } from '../state/types.js';
 import type { InputAction } from '../systems/InputSystem.js';
 import { createInitialState, resetState, spawnNextPiece } from '../state/WorldState.js';
 import { createRng } from '../util/rng.js';
+import type { LineClearResult } from '../systems/TetrisSystem.js';
 import {
   tryMove,
   tryRotate,
   hardDrop,
   tickGravity,
   collides,
+  stackReachedTop,
 } from '../systems/TetrisSystem.js';
 import { BOARD_WIDTH, BOARD_HEIGHT } from '../config/tetris.js';
 import { renderInstance, clearInstanceRenderCache } from './RenderSystemInstance.js';
+import { tickReactorColumnLava, clearReactorLavaState, DEFAULT_REACTOR_THEME } from '../plots/ReactorArcade.js';
 import type { HudPayload } from '../services/HudService.js';
 import { buildHudPayload } from '../services/HudService.js';
 import type { LeaderboardPayload } from '../schema/hudMessages.js';
@@ -42,6 +45,10 @@ export class GameInstance {
   dirty: boolean;
   /** Throttle re-renders. */
   lastRenderMs: number;
+  /** When set, next HUD send should include lineClearBurst then clear this. */
+  pendingLineClearBurst: LineClearResult | null;
+  /** When set, next HUD send should include pieceLock (block landed) then clear this. */
+  pendingPieceLock: boolean;
 
   constructor(plot: Plot, playerId: string, seed?: number) {
     this.plot = plot;
@@ -50,6 +57,8 @@ export class GameInstance {
     this.gameStarted = false;
     this.dirty = true;
     this.lastRenderMs = 0;
+    this.pendingLineClearBurst = null;
+    this.pendingPieceLock = false;
   }
 
   /** Call when player sends 'start' — enables gravity and piece spawn. */
@@ -64,6 +73,7 @@ export class GameInstance {
     this.state.softDropActive = softDropActive;
     if (action === 'reset') {
       resetState(this.state);
+      this.gameStarted = false;
       this.dirty = true;
       return;
     }
@@ -73,8 +83,10 @@ export class GameInstance {
     else if (action === 'rotate') tryRotate(this.state);
     else if (action === 'hardDrop') {
       const rngObj = createRng(getRngSeed(this.state));
-      hardDrop(this.state, () => rngObj.next());
+      const lineClear = hardDrop(this.state, () => rngObj.next());
       this.state.rngState = rngObj.getState();
+      this.pendingPieceLock = true;
+      if (lineClear.linesCleared > 0) this.pendingLineClearBurst = lineClear;
     }
     this.dirty = true;
   }
@@ -99,10 +111,14 @@ export class GameInstance {
 
     // Spawn piece if none
     if (state.gameStatus === 'RUNNING' && !state.activePiece) {
-      spawnNextPiece(state, rng);
-      if (state.activePiece && collides(state.board, state.activePiece)) {
+      if (stackReachedTop(state.board)) {
         state.gameStatus = 'GAME_OVER';
-        state.activePiece = null;
+      } else {
+        spawnNextPiece(state, rng);
+        if (state.activePiece && collides(state.board, state.activePiece)) {
+          state.gameStatus = 'GAME_OVER';
+          state.activePiece = null;
+        }
       }
       this.dirty = true;
     }
@@ -118,18 +134,26 @@ export class GameInstance {
     if (state.activePiece && state.gravityAccumulatorMs === 0) {
       state.gravityAccumulatorMs = state.softDropActive ? 50 : state.gravityIntervalMs;
     }
-    tickGravity(state, effectiveDeltaMs, rng);
+    const lineClear = tickGravity(state, effectiveDeltaMs, rng, Date.now());
+    if (lineClear) {
+      this.pendingPieceLock = true;
+      if (lineClear.linesCleared > 0) this.pendingLineClearBurst = lineClear;
+    }
     this.dirty = true;
 
     state.rngState = rngObj.getState();
 
     // Emergency spawn
     if (state.gameStatus === 'RUNNING' && !state.activePiece) {
-      spawnNextPiece(state, () => rngObj.next());
-      state.rngState = rngObj.getState();
-      if (state.activePiece && collides(state.board, state.activePiece)) {
+      if (stackReachedTop(state.board)) {
         state.gameStatus = 'GAME_OVER';
-        state.activePiece = null;
+      } else {
+        spawnNextPiece(state, () => rngObj.next());
+        state.rngState = rngObj.getState();
+        if (state.activePiece && collides(state.board, state.activePiece)) {
+          state.gameStatus = 'GAME_OVER';
+          state.activePiece = null;
+        }
       }
       this.dirty = true;
     }
@@ -142,24 +166,27 @@ export class GameInstance {
 
   /**
    * Render this instance's board to the world at plot.origin.
-   * Only does work if dirty and throttle allows.
+   * Column lava is ticked every call for motion; board only if dirty and throttle allows.
    */
   render(world: World): void {
     const now = Date.now();
+    tickReactorColumnLava(world, this.plot, now, DEFAULT_REACTOR_THEME);
     if (!this.dirty && now - this.lastRenderMs < RENDER_THROTTLE_MS) return;
     renderInstance(this.state, world, this.plot.origin, this.plot.id);
     this.dirty = false;
     this.lastRenderMs = now;
   }
 
-  /** Reset this instance's game (same seed). Used by /reset. */
+  /** Reset this instance's game (same seed). Used by /reset. Clears gameStarted so client shows Start again. */
   reset(seed?: number): void {
     resetState(this.state, seed);
+    this.gameStarted = false;
     this.dirty = true;
   }
 
   /** Clear this instance's rendered blocks and cache. Call when releasing plot. */
   clearAndDestroy(world: World): void {
     clearInstanceRenderCache(world, this.plot);
+    clearReactorLavaState(this.plot.id);
   }
 }

@@ -67,6 +67,8 @@ export function createInitialState(seed?: number): TetrisState {
     seed,
     rngState: rngObj.getState(),
     lastLinesCleared: 0,
+    lastLineClearTimeMs: 0,
+    comboCount: 0,
   };
 }
 
@@ -86,6 +88,8 @@ export function resetState(state: TetrisState, seed?: number): void {
   state.seed = s.seed;
   state.rngState = s.rngState;
   state.lastLinesCleared = s.lastLinesCleared;
+  state.lastLineClearTimeMs = s.lastLineClearTimeMs;
+  state.comboCount = s.comboCount;
 }
 
 /** Spawn the next piece onto the board; returns the new active piece or null if spawn collides (game over). */

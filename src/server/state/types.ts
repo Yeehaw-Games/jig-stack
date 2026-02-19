@@ -42,6 +42,10 @@ export interface TetrisState {
   rngState?: number;
   /** Last lines cleared in the previous lock (for scoring display). */
   lastLinesCleared: number;
+  /** Timestamp (ms) of last line clear; 0 = none. Used for combo window. */
+  lastLineClearTimeMs: number;
+  /** Consecutive line clears within combo window; 0 = first clear or window expired. */
+  comboCount: number;
 }
 
 export type TetrominoName = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';

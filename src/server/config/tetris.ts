@@ -6,6 +6,11 @@
 export const BOARD_WIDTH = 10;
 export const BOARD_HEIGHT = 20;
 
+/** Rows above the play area (0..BOARD_HEIGHT-1) where the piece spawns; piece drops in from here. */
+export const SPAWN_ZONE_ROWS = 4;
+/** Total grid rows we render (play area + spawn zone). Walls/boardBounds use this height. */
+export const BOARD_RENDER_HEIGHT = BOARD_HEIGHT + SPAWN_ZONE_ROWS;
+
 /** World origin for the board: first cell (0,0) maps to this world position. */
 export const BOARD_ORIGIN = { x: 0, y: 0, z: 0 };
 
@@ -26,9 +31,9 @@ export const WALL_DEPTH_BACK = 2;
 /** Probability [0,1] that a wall cell is filled; rest stay air for a broken/ruined look. 1 = solid. */
 export const WALL_FILL_PROBABILITY = 0.92;
 
-/** Spawn position: grid column and row. Top of 4x4 piece box; piece must fit in 0..BOARD_HEIGHT-1. */
+/** Spawn position: grid column and row. Grid row 0 = bottom; world Y increases upward. */
 export const SPAWN_X = 3; // center-ish for 4-cell-wide pieces (e.g. I spans 3,4,5,6)
-export const SPAWN_Y = BOARD_HEIGHT - 4; // 16: so lowest cell of any 4-high rotation is at row 19
+export const SPAWN_Y = BOARD_HEIGHT; // spawn above play area: piece occupies rows 20–23 (drops in from top)
 
 /** Gravity: interval in ms between automatic downward moves. Decreases with level. */
 export const GRAVITY_BASE_MS = 800;
@@ -48,6 +53,11 @@ export const SCORE_PER_LINES: Record<number, number> = {
   3: 500,
   4: 800,
 };
+
+/** Combo: if a line clear happens within this many ms of the previous, multiplier stacks. */
+export const COMBO_WINDOW_MS = 5000;
+/** Per-stack multiplier: 1 + (comboCount * COMBO_MULTIPLIER_PER_STACK). */
+export const COMBO_MULTIPLIER_PER_STACK = 0.1;
 
 /** Piece type id to block type id (1-7). 0 is reserved for air. */
 export const PIECE_TYPE_TO_BLOCK_ID: Record<number, number> = {
