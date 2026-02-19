@@ -8,6 +8,7 @@
 (function () {
   var SCORE_BURST_DURATION_MS = 900;
   var SCREEN_SHAKE_DURATION_MS = 300;
+  var LEVEL_UP_MOMENT_DURATION_MS = 1200;
 
   // Resolve assets base URL from this script's src (e.g. .../assets/ui/hud.js -> .../assets)
   var scriptEl = document.currentScript;
@@ -196,10 +197,39 @@
     }
   }
 
+  var COMBO_BURST_DURATION_MS = 900;
+  function showComboBurst(comboCount) {
+    if (comboCount < 1) return;
+    var pop = document.createElement('div');
+    pop.className = 'combo-burst';
+    pop.textContent = 'Combo x' + (comboCount + 1);
+    document.body.appendChild(pop);
+    setTimeout(function () {
+      pop.remove();
+    }, COMBO_BURST_DURATION_MS);
+  }
+
+  /** Short screen tint + "Level N" splash when level increases. */
+  function showLevelUpMoment(level) {
+    if (level == null || level === '') return;
+    var overlay = document.createElement('div');
+    overlay.className = 'level-up-moment';
+    overlay.setAttribute('aria-hidden', 'true');
+    var text = document.createElement('div');
+    text.className = 'level-up-moment__text';
+    text.textContent = 'Level ' + level;
+    overlay.appendChild(text);
+    document.body.appendChild(overlay);
+    setTimeout(function () {
+      overlay.remove();
+    }, LEVEL_UP_MOMENT_DURATION_MS);
+  }
+
   function updateUI(data) {
     const el = function id(name) { return document.getElementById(name); };
     if (data.type === 'lineClearBurst') {
       showScoreBurst(data.points, data.linesCleared);
+      if (data.comboCount >= 1) showComboBurst(data.comboCount);
       if (data.linesCleared === 4 && typeof confetti === 'function') {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
       }
@@ -239,7 +269,10 @@
     var ScoreBar = window.TetrisHudComponents && window.TetrisHudComponents.ScoreBar;
     if (ScoreBar && (data.score !== undefined || data.level !== undefined || data.lines !== undefined)) {
       var changes = ScoreBar.update({ score: data.score, level: data.level, lines: data.lines });
-      if (data.level !== undefined && lastLevel !== undefined && data.level > lastLevel) playLevelUpSound();
+      if (data.level !== undefined && lastLevel !== undefined && data.level > lastLevel) {
+        playLevelUpSound();
+        showLevelUpMoment(data.level);
+      }
       if (data.level !== undefined) lastLevel = data.level;
       ScoreBar.applyAnimationClasses(changes);
     } else {
@@ -247,10 +280,21 @@
       if (data.level !== undefined) {
         var l = el('level');
         if (l) l.textContent = data.level;
-        if (lastLevel !== undefined && data.level > lastLevel) playLevelUpSound();
+        if (lastLevel !== undefined && data.level > lastLevel) {
+          playLevelUpSound();
+          showLevelUpMoment(data.level);
+        }
         lastLevel = data.level;
       }
       if (data.lines !== undefined) { var n = el('lines'); if (n) n.textContent = data.lines; }
+    }
+    if (data.comboCount !== undefined) {
+      var c = el('combo');
+      if (c) {
+        c.textContent = data.comboCount === 0 ? '\u2014' : 'x' + (data.comboCount + 1);
+        var statCombo = c.closest('.stat');
+        if (statCombo) statCombo.classList.toggle('combo-active', data.comboCount > 0);
+      }
     }
 
     // ——— Normalized status: gameover overlay, soundtrack, controls-hud visibility ———

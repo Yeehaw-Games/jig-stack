@@ -169,7 +169,7 @@ export function softDrop(state: TetrisState): boolean {
  */
 export function hardDrop(state: TetrisState, rng: () => number, nowMs: number): LineClearResult {
   const p = state.activePiece;
-  const zero: LineClearResult = { linesCleared: 0, points: 0 };
+  const zero: LineClearResult = { linesCleared: 0, points: 0, comboCount: 0 };
   if (!p || state.gameStatus !== 'RUNNING') return zero;
   let dy = 0;
   while (tryMove(state, 0, -1)) dy++;
@@ -179,6 +179,7 @@ export function hardDrop(state: TetrisState, rng: () => number, nowMs: number): 
 export interface LineClearResult {
   linesCleared: number;
   points: number;
+  comboCount: number;
 }
 
 function findFullRows(board: BoardGrid): number[] {
@@ -244,7 +245,7 @@ export function finalizeLineClear(state: TetrisState): void {
  */
 function mergeAndClearLines(state: TetrisState, nowMs: number): LineClearResult {
   const p = state.activePiece;
-  const zero: LineClearResult = { linesCleared: 0, points: 0 };
+  const zero: LineClearResult = { linesCleared: 0, points: 0, comboCount: 0 };
   if (!p) return zero;
 
   const cells = getPieceCells(p);
@@ -265,7 +266,7 @@ function mergeAndClearLines(state: TetrisState, nowMs: number): LineClearResult 
   state.lineClearFxRows = [...fullRows];
   state.lineClearFxUntilMs = nowMs + LINE_CLEAR_FLASH_MS;
 
-  return { linesCleared: fullRows.length, points };
+  return { linesCleared: fullRows.length, points, comboCount: state.comboCount };
 }
 
 /** Lock current piece: merge into board, clear lines, spawn next (or game over). Returns line clear result when lines were cleared. */

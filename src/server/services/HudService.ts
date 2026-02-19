@@ -19,6 +19,7 @@ export interface HudPayload {
   score: number;
   level: number;
   lines: number;
+  comboCount: number;
   status: string; // RUNNING | GAME_OVER | ASSIGNING_PLOT | NO_PLOT
   gameStarted: boolean;
   leaderboard?: LeaderboardPayload;
@@ -35,6 +36,7 @@ export function buildHudPayload(
     score: state.score,
     level: state.level,
     lines: state.lines,
+    comboCount: state.comboCount,
     status: state.gameStatus,
     gameStarted,
   };
@@ -56,6 +58,7 @@ function idleHudPayload(leaderboard?: LeaderboardPayload, noPlot?: boolean): Hud
     score: 0,
     level: 1,
     lines: 0,
+    comboCount: 0,
     status: noPlot ? 'NO_PLOT' : 'ASSIGNING_PLOT',
     gameStarted: false,
     nextPiece: null,
@@ -85,11 +88,12 @@ export function sendHudToPlayer(
   player.ui.sendData(payload);
 
   if (instance?.pendingLineClearBurst) {
-    const { points, linesCleared } = instance.pendingLineClearBurst;
+    const { points, linesCleared, comboCount } = instance.pendingLineClearBurst;
     player.ui.sendData({
       type: 'lineClearBurst',
       points,
       linesCleared,
+      comboCount,
     });
     instance.pendingLineClearBurst = null;
   }

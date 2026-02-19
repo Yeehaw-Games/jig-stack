@@ -22,6 +22,8 @@ export interface HudPayload {
   score: number;
   level: number;
   lines: number;
+  /** Consecutive line clears within combo window; 0 = first clear or expired. */
+  comboCount?: number;
   status: string;
   gameStarted: boolean;
   /** When present, client updates the leaderboard panel. */
