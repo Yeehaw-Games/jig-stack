@@ -200,6 +200,9 @@
     const el = function id(name) { return document.getElementById(name); };
     if (data.type === 'lineClearBurst') {
       showScoreBurst(data.points, data.linesCleared);
+      if (data.linesCleared === 4 && typeof confetti === 'function') {
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+      }
       /* Fall through so merged payloads still update score/level/lines */
     }
     if (data.type === 'pieceLock') {
@@ -264,7 +267,15 @@
           if (linesEl) linesEl.textContent = data.lines != null ? data.lines : 0;
           overlay.classList.add('visible');
           overlay.setAttribute('aria-hidden', 'false');
-          if (lastStatus !== 'gameover') playGameOverSound();
+          if (lastStatus !== 'gameover') {
+            playGameOverSound();
+            if (typeof confetti === 'function') {
+              confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 } });
+              setTimeout(function () {
+                confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 }, colors: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181'] });
+              }, 200);
+            }
+          }
         } else {
           overlay.classList.remove('visible');
           overlay.setAttribute('aria-hidden', 'true');

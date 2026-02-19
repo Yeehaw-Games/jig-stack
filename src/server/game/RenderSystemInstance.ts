@@ -32,6 +32,7 @@ function getCache(plotId: string): InstanceCache {
 }
 
 function getDesiredCell(state: TetrisState, x: number, y: number): number {
+  // Active piece (solid) on top
   if (state.activePiece) {
     const cells = getPieceCells(state.activePiece);
     const type = state.activePiece.type;
@@ -79,7 +80,8 @@ export function renderInstance(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const id = getDesiredCell(state, x, y);
-      let blockId = id === 0 ? 0 : PIECE_TYPE_TO_BLOCK_ID[id] ?? 0;
+      let blockId =
+        id === 0 ? 0 : PIECE_TYPE_TO_BLOCK_ID[id] ?? 0;
       if (fxRows && fxRows.has(y) && blockId !== 0) blockId = GLOW_BLOCK_ID;
       desired.set(cellKey(x, y), blockId);
     }

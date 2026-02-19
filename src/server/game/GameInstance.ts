@@ -54,6 +54,10 @@ export class GameInstance {
   /** One-shot particle emitters used to fake a bloom/glow burst on line clear. */
   private _lineClearFxEmitters: ParticleEmitter[];
   private _lineClearFxUntilMsApplied: number;
+  /** When true, next render should spawn game-over confetti then clear this. */
+  private _pendingGameOverConfetti: boolean;
+  /** One-shot particle emitters for game-over confetti. */
+  private _gameOverConfettiEmitters: ParticleEmitter[];
 
   constructor(plot: Plot, playerId: string, seed?: number) {
     this.plot = plot;
@@ -66,6 +70,8 @@ export class GameInstance {
     this.pendingPieceLock = false;
     this._lineClearFxEmitters = [];
     this._lineClearFxUntilMsApplied = 0;
+    this._pendingGameOverConfetti = false;
+    this._gameOverConfettiEmitters = [];
   }
 
   private _clearLineClearFxEmitters(): void {
@@ -140,6 +146,123 @@ export class GameInstance {
         }
       }, msRemaining + 350);
     }
+
+    // Tetris (4-line) celebration: extra burst at center with more particles and distinct colors
+    if (rows.length === 4) {
+      const midY = origin.y + (rows[0]! + rows[3]!) / 2 + 0.5;
+      const tetrisEmitter = new ParticleEmitter({
+        textureUri: 'particles/star_01.png',
+        position: { x: centerX, y: midY, z: zInFrontOfBoard },
+        positionVariance: { x: BOARD_WIDTH * 0.6, y: 0.5, z: 0.15 },
+        maxParticles: 280,
+        rate: 0,
+        lifetime: 0.4,
+        lifetimeVariance: 0.1,
+        sizeStart: 0.4,
+        sizeStartVariance: 0.15,
+        sizeEnd: 0.06,
+        sizeEndVariance: 0.04,
+        opacityStart: 0.95,
+        opacityStartVariance: 0.05,
+        opacityEnd: 0,
+        opacityEndVariance: 0.05,
+        colorStart: { r: 255, g: 200, b: 60 },
+        colorStartVariance: { r: 40, g: 30, b: 20 },
+        colorEnd: { r: 255, g: 100, b: 255 },
+        colorEndVariance: { r: 30, g: 30, b: 30 },
+        colorIntensityStart: 3.2,
+        colorIntensityEnd: 2.2,
+        velocity: { x: 0, y: 0.4, z: 0 },
+        velocityVariance: { x: 2.2, y: 0.8, z: 0.3 },
+        gravity: { x: 0, y: 0, z: 0 },
+        transparent: true,
+      });
+      tetrisEmitter.spawn(world);
+      tetrisEmitter.burst(140);
+      this._lineClearFxEmitters.push(tetrisEmitter);
+      setTimeout(() => {
+        try {
+          if (tetrisEmitter.isSpawned) tetrisEmitter.despawn();
+        } catch {
+          // ignore
+        }
+      }, msRemaining + 550);
+    }
+  }
+
+  private _clearGameOverConfettiEmitters(): void {
+    for (const emitter of this._gameOverConfettiEmitters) {
+      try {
+        emitter.despawn();
+      } catch {
+        // ignore
+      }
+    }
+    this._gameOverConfettiEmitters = [];
+  }
+
+  private _applyGameOverConfetti(world: World): void {
+    if (!this._pendingGameOverConfetti) return;
+    this._pendingGameOverConfetti = false;
+    this._clearGameOverConfettiEmitters();
+
+    const origin = this.plot.origin;
+    const centerX = origin.x + (BOARD_WIDTH - 1) / 2;
+    const centerY = origin.y + BOARD_HEIGHT / 2;
+    const zInFrontOfBoard = origin.z + 0.8;
+
+    const confettiColors = [
+      { start: { r: 255, g: 80, b: 80 }, end: { r: 200, g: 40, b: 40 } },
+      { start: { r: 80, g: 180, b: 255 }, end: { r: 40, g: 120, b: 200 } },
+      { start: { r: 255, g: 220, b: 80 }, end: { r: 220, g: 180, b: 40 } },
+      { start: { r: 100, g: 255, b: 120 }, end: { r: 60, g: 200, b: 80 } },
+      { start: { r: 220, g: 120, b: 255 }, end: { r: 180, g: 80, b: 200 } },
+    ];
+    const burstCount = 70;
+    const lifetime = 1.2;
+    const cleanupMs = (lifetime + 0.5) * 1000;
+
+    for (const { start: colorStart, end: colorEnd } of confettiColors) {
+      const emitter = new ParticleEmitter({
+        textureUri: 'particles/star_01.png',
+        position: { x: centerX, y: centerY, z: zInFrontOfBoard },
+        positionVariance: { x: BOARD_WIDTH * 0.4, y: BOARD_HEIGHT * 0.2, z: 0.3 },
+        maxParticles: 150,
+        rate: 0,
+        lifetime,
+        lifetimeVariance: 0.3,
+        sizeStart: 0.2,
+        sizeStartVariance: 0.1,
+        sizeEnd: 0.08,
+        sizeEndVariance: 0.04,
+        opacityStart: 0.95,
+        opacityStartVariance: 0.05,
+        opacityEnd: 0,
+        opacityEndVariance: 0.05,
+        colorStart,
+        colorStartVariance: { r: 30, g: 30, b: 30 },
+        colorEnd,
+        colorEndVariance: { r: 20, g: 20, b: 20 },
+        colorIntensityStart: 1.5,
+        colorIntensityEnd: 1,
+        velocity: { x: 0, y: 2.5, z: 0 },
+        velocityVariance: { x: 2, y: 1.2, z: 0.8 },
+        gravity: { x: 0, y: -3, z: 0 },
+        transparent: true,
+      });
+
+      emitter.spawn(world);
+      emitter.burst(burstCount);
+      this._gameOverConfettiEmitters.push(emitter);
+
+      setTimeout(() => {
+        try {
+          if (emitter.isSpawned) emitter.despawn();
+        } catch {
+          // ignore
+        }
+      }, cleanupMs);
+    }
   }
 
   /** Call when player sends 'start' — enables gravity and piece spawn. */
@@ -209,11 +332,13 @@ export class GameInstance {
     if (state.gameStatus === 'RUNNING' && !state.activePiece) {
       if (stackReachedTop(state.board)) {
         state.gameStatus = 'GAME_OVER';
+        this._pendingGameOverConfetti = true;
       } else {
         spawnNextPiece(state, rng);
         if (state.activePiece && collides(state.board, state.activePiece)) {
           state.gameStatus = 'GAME_OVER';
           state.activePiece = null;
+          this._pendingGameOverConfetti = true;
         }
       }
       this.dirty = true;
@@ -243,12 +368,14 @@ export class GameInstance {
     if (state.gameStatus === 'RUNNING' && !state.activePiece) {
       if (stackReachedTop(state.board)) {
         state.gameStatus = 'GAME_OVER';
+        this._pendingGameOverConfetti = true;
       } else {
         spawnNextPiece(state, () => rngObj.next());
         state.rngState = rngObj.getState();
         if (state.activePiece && collides(state.board, state.activePiece)) {
           state.gameStatus = 'GAME_OVER';
           state.activePiece = null;
+          this._pendingGameOverConfetti = true;
         }
       }
       this.dirty = true;
@@ -268,6 +395,7 @@ export class GameInstance {
     const now = Date.now();
     tickReactorColumnLava(world, this.plot, now, DEFAULT_REACTOR_THEME);
     this._applyLineClearBloomFx(world, now);
+    this._applyGameOverConfetti(world);
     if (!this.dirty && now - this.lastRenderMs < RENDER_THROTTLE_MS) return;
     renderInstance(this.state, world, this.plot.origin, this.plot.id);
     this.dirty = false;
@@ -278,12 +406,15 @@ export class GameInstance {
   reset(seed?: number): void {
     resetState(this.state, seed);
     this.gameStarted = false;
+    this._pendingGameOverConfetti = false;
+    this._clearGameOverConfettiEmitters();
     this.dirty = true;
   }
 
   /** Clear this instance's rendered blocks and cache. Call when releasing plot. */
   clearAndDestroy(world: World): void {
     this._clearLineClearFxEmitters();
+    this._clearGameOverConfettiEmitters();
     clearInstanceRenderCache(world, this.plot);
     clearReactorLavaState(this.plot.id);
   }
