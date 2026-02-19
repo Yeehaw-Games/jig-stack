@@ -148,7 +148,7 @@ startServer((world: World) => {
 
   startLeaderboardBroadcastInterval(world);
 
-  const SOUNDTRACK_URI = 'audio/soundtrack.mp3';
+  const SOUNDTRACK_URI = 'audio/get-jiggy-with-jigg-stack.mp3';
   // Soundtrack is played client-side from the UI (assets/ui/hud.js) so the mute button can
   // actually pause it; the engine has no per-player mute API for world audio.
   // So we do not play the soundtrack on the world here.

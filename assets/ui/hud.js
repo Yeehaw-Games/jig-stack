@@ -14,6 +14,11 @@
   var scriptEl = document.currentScript;
   var scriptSrc = scriptEl ? scriptEl.src : '';
   var assetsBase = scriptSrc.replace(/\/ui\/hud\.js(\?.*)?$/i, '');
+  if (!assetsBase && typeof document !== 'undefined' && document.location) {
+    var path = document.location.pathname || '';
+    var uiIdx = path.indexOf('/ui/');
+    if (uiIdx >= 0) assetsBase = (document.location.origin || '') + path.slice(0, uiIdx) + '/assets';
+  }
   /** One-shot sound when game ends (play only on transition to GAME_OVER). */
   var gameOverSoundUrl = assetsBase ? assetsBase + '/audio/game-over.mp3' : '';
   /** Voice line after game-over sound. */
@@ -21,7 +26,9 @@
   /** Jig stacked clip after game-over voice. */
   var jigStackedUrl = assetsBase ? assetsBase + '/audio/jig-stacked.mp3' : '';
   /** In-game looping background music (play only when status is RUNNING). */
-  var soundtrackUrl = assetsBase ? assetsBase + '/audio/soundtrack.mp3' : '';
+  var soundtrackUrl = assetsBase ? assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3' : '';
+  /** Main BGM playlist; use host-injected array if present, else single track. */
+  var soundtrackPlaylist = (typeof soundtrackPlaylist !== 'undefined' && Array.isArray(soundtrackPlaylist)) ? soundtrackPlaylist : (assetsBase ? [assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3'] : []);
   var lineClearSoundUrl = assetsBase ? assetsBase + '/audio/line-clear.mp3' : '';
   /** One-shot when player clears exactly 2 lines. */
   var break2LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-2-lines.mp3' : '';
@@ -40,15 +47,85 @@
   /** Last level we saw (to play level-up sound only when level increases). */
   var lastLevel = undefined;
 
-  var soundtrackEl = null;
-  function getSoundtrack() {
-    if (soundtrackEl) return soundtrackEl;
-    if (!soundtrackUrl) return null;
-    var audio = new window.Audio(soundtrackUrl);
-    audio.loop = true;
-    audio.volume = 0.5;
-    soundtrackEl = audio;
-    return audio;
+  var soundtrackElements = [];
+  /** 0 = main (get-jiggy), 1 = intense (original). */
+  var currentSoundtrackIndex = 0;
+  var fadeTimerId = null;
+  var SOUNDTRACK_TARGET_VOLUME = 0.5;
+  var SOUNDTRACK_CROSSFADE_DURATION_MS = 1800;
+  var lastStackHeight = 0;
+
+  function shouldPlaySoundtrack() {
+    var isRunning = lastStatus === 'playing' || lastStatus === 'RUNNING';
+    return isRunning && lastAppliedMusicMuted !== true;
+  }
+
+  function cancelFade() {
+    if (fadeTimerId != null) {
+      clearInterval(fadeTimerId);
+      fadeTimerId = null;
+    }
+  }
+
+  function getSoundtrackElements() {
+    if (soundtrackElements.length === soundtrackPlaylist.length) return soundtrackElements;
+    for (var i = 0; i < soundtrackPlaylist.length; i++) {
+      var url = soundtrackPlaylist[i];
+      var audio = new window.Audio();
+      audio.preload = 'auto';
+      audio.loop = true;
+      audio.volume = 0;
+      audio.src = url;
+      audio.load();
+      soundtrackElements.push(audio);
+    }
+    return soundtrackElements;
+  }
+
+  /** Crossfade from current track to target index (0 = main, 1 = intense). */
+  function crossfadeToTrack(toIndex) {
+    var elements = getSoundtrackElements();
+    if (elements.length < 2 || toIndex === currentSoundtrackIndex) return;
+    var fromIndex = currentSoundtrackIndex;
+    var fromEl = elements[fromIndex];
+    var toEl = elements[toIndex];
+    toEl.currentTime = 0;
+    toEl.volume = 0;
+    toEl.play().catch(function () {});
+    cancelFade();
+    var start = Date.now();
+    fadeTimerId = setInterval(function () {
+      if (!shouldPlaySoundtrack()) {
+        fromEl.pause();
+        toEl.pause();
+        cancelFade();
+        return;
+      }
+      var elapsed = Date.now() - start;
+      if (elapsed >= SOUNDTRACK_CROSSFADE_DURATION_MS) {
+        fromEl.volume = 0;
+        fromEl.pause();
+        toEl.volume = SOUNDTRACK_TARGET_VOLUME;
+        currentSoundtrackIndex = toIndex;
+        cancelFade();
+        return;
+      }
+      var t = elapsed / SOUNDTRACK_CROSSFADE_DURATION_MS;
+      fromEl.volume = (1 - t) * SOUNDTRACK_TARGET_VOLUME;
+      toEl.volume = t * SOUNDTRACK_TARGET_VOLUME;
+    }, 50);
+  }
+
+  /** When stack height crosses threshold, crossfade between main and intense track. */
+  function applySoundtrackIntensity() {
+    if (!shouldPlaySoundtrack()) return;
+    var elements = getSoundtrackElements();
+    if (elements.length < 2) return;
+    var wantIntense = lastStackHeight >= STACK_HEIGHT_INTENSE_THRESHOLD;
+    var wantIndex = wantIntense ? 1 : 0;
+    if (wantIndex !== currentSoundtrackIndex && fadeTimerId == null) {
+      crossfadeToTrack(wantIndex);
+    }
   }
 
   var lastAppliedMusicMuted = undefined;
@@ -59,11 +136,9 @@
   window.__tetrisSfxMuted = false;
 
   function setMusicMuted(muted) {
-    var st = getSoundtrack();
-    if (!st) return;
-    if (muted) {
-      st.pause();
-    }
+    var elements = getSoundtrackElements();
+    for (var i = 0; i < elements.length; i++) elements[i].pause();
+    if (muted) cancelFade();
     /* When unmuted, playback is started only when status is RUNNING (see applySoundtrackForStatus). */
   }
 
@@ -89,16 +164,46 @@
     });
   }
 
-  /** Start or stop soundtrack based on status and mute. Plays when game is running (accepts 'playing' or 'RUNNING'). */
+  function startTrackByIndex(elements, index) {
+    for (var i = 0; i < elements.length; i++) {
+      if (i === index) {
+        elements[i].currentTime = 0;
+        elements[i].volume = SOUNDTRACK_TARGET_VOLUME;
+        elements[i].play().catch(function () {
+          if (elements.length > 1) {
+            currentSoundtrackIndex = index === 0 ? 1 : 0;
+            startTrackByIndex(elements, currentSoundtrackIndex);
+          }
+        });
+      } else {
+        elements[i].pause();
+        elements[i].volume = 0;
+      }
+    }
+  }
+
+  /** Start soundtrack from a user gesture (e.g. Start Game click) so the browser allows play(). */
+  function startSoundtrackFromUserGesture() {
+    if (lastAppliedMusicMuted === true) return;
+    var elements = getSoundtrackElements();
+    if (elements.length === 0) return;
+    startTrackByIndex(elements, 0);
+  }
+
+  /** Start or stop soundtrack based on status and mute. Main track (get-jiggy) by default; intensity switches to intense track. */
   function applySoundtrackForStatus(status, musicMuted) {
-    var st = getSoundtrack();
-    if (!st) return;
-    var isPlaying = status === 'playing' || status === 'RUNNING';
-    if (isPlaying && !musicMuted) {
-      st.volume = 0.5;
-      st.play().catch(function () {});
+    var elements = getSoundtrackElements();
+    if (elements.length === 0) return;
+    var isPlaying = (status === 'playing' || status === 'RUNNING') && !musicMuted;
+    if (isPlaying) {
+      cancelFade();
+      var wantIntense = typeof STACK_HEIGHT_INTENSE_THRESHOLD === 'number' && lastStackHeight >= STACK_HEIGHT_INTENSE_THRESHOLD;
+      var idx = wantIntense ? 1 : 0;
+      currentSoundtrackIndex = idx;
+      // Soundtrack starts only from user gesture (Start Game / Start New Game), not from server payload.
     } else {
-      st.pause();
+      for (var i = 0; i < elements.length; i++) elements[i].pause();
+      cancelFade();
     }
   }
 
@@ -239,6 +344,7 @@
       playBlockLandSound();
       return;
     }
+    if (data.stackHeight !== undefined) lastStackHeight = data.stackHeight;
     if (data.leaderboard !== undefined) updateLeaderboard(data.leaderboard);
     if (data.musicMuted !== undefined) {
       var muteBtn = el('btn-mute-music');
@@ -327,6 +433,7 @@
       }
       applySoundtrackForStatus(status, lastAppliedMusicMuted === true);
       lastStatus = status;
+      applySoundtrackIntensity();
     }
 
     // ——— Start Game panel (right-side HUD): visible only when game not started; hide during play and after game over until they click Start New Game. ———
@@ -367,6 +474,7 @@
       e.preventDefault();
       playButtonClickSound();
       var a = this.getAttribute('data-action');
+      if (a === 'start' || a === 'reset') startSoundtrackFromUserGesture();
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
     });
@@ -386,6 +494,7 @@
       e.preventDefault();
       playButtonClickSound();
       var a = this.getAttribute('data-action');
+      if (a === 'start' || a === 'reset') startSoundtrackFromUserGesture();
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
     }, { passive: false });

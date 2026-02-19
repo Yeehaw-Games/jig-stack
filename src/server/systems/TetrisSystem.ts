@@ -129,6 +129,15 @@ export function stackReachedTop(board: BoardGrid): boolean {
   return false;
 }
 
+/** Highest filled row as 1–20 (1-based). 0 = empty. Used for intensity-based BGM. */
+export function getStackHeight(board: BoardGrid): number {
+  for (let y = 0; y < BOARD_HEIGHT; y++) {
+    const row = board[y];
+    if (row?.some((c) => c !== 0)) return y + 1;
+  }
+  return 0;
+}
+
 /** Try to move piece by (dx, dy). Returns true if move was applied. */
 export function tryMove(state: TetrisState, dx: number, dy: number): boolean {
   const p = state.activePiece;

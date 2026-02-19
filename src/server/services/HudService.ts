@@ -7,7 +7,7 @@ import type { Player } from 'hytopia';
 import type { TetrisState } from '../state/types.js';
 import type { LeaderboardPayload } from '../schema/hudMessages.js';
 import { getInstanceByPlayer } from '../game/InstanceRegistry.js';
-import { getPieceMatrix, getPieceTypeLetter } from '../systems/TetrisSystem.js';
+import { getPieceMatrix, getPieceTypeLetter, getStackHeight } from '../systems/TetrisSystem.js';
 
 /** Next piece for HUD preview: type letter (I,O,T,S,Z,J,L) and 4x4 matrix. */
 export interface NextPiecePayload {
@@ -22,6 +22,8 @@ export interface HudPayload {
   comboCount: number;
   status: string; // RUNNING | GAME_OVER | ASSIGNING_PLOT | NO_PLOT
   gameStarted: boolean;
+  /** Highest filled row count (1–20). 0 = empty. Used for intensity-based BGM. */
+  stackHeight?: number;
   leaderboard?: LeaderboardPayload;
   /** Next piece for preview panel; only when game is running and next piece exists. */
   nextPiece?: NextPiecePayload | null;
@@ -39,6 +41,7 @@ export function buildHudPayload(
     comboCount: state.comboCount,
     status: state.gameStatus,
     gameStarted,
+    stackHeight: getStackHeight(state.board),
   };
   if (leaderboard) payload.leaderboard = leaderboard;
   if (state.gameStatus === 'RUNNING' && state.nextPiece) {
@@ -61,6 +64,7 @@ function idleHudPayload(leaderboard?: LeaderboardPayload, noPlot?: boolean): Hud
     comboCount: 0,
     status: noPlot ? 'NO_PLOT' : 'ASSIGNING_PLOT',
     gameStarted: false,
+    stackHeight: 0,
     nextPiece: null,
   };
   if (leaderboard) payload.leaderboard = leaderboard;
