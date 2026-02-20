@@ -1,0 +1,95 @@
+/* Mobile-specific HUD layout rules (applied via :root.mode-mobile). */
+
+:root.mode-mobile #hud {
+  padding: 10px;
+}
+
+/* Full-screen gesture capture layer: prevents camera movement behind HUD. */
+#mobile-gesture-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: transparent;
+  touch-action: none;
+}
+#mobile-gesture-layer.active {
+  pointer-events: auto;
+}
+/* Ensure HUD content sits above gesture layer. */
+#hud {
+  z-index: 2;
+}
+
+/* Compact HUD top: shrink right-side stack on mobile. */
+:root.mode-mobile .leaderboard-panel,
+:root.mode-mobile .controls-panel-right {
+  display: none;
+}
+
+:root.mode-mobile .hud-right-stack {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  gap: 8px;
+  width: auto;
+}
+
+:root.mode-mobile .next-preview-panel {
+  width: 128px;
+  transform: scale(0.92);
+  transform-origin: top right;
+}
+
+/* Bottom control bar */
+#mobile-controls {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 3;
+  display: none;
+  gap: 12px;
+  justify-content: center;
+  pointer-events: auto;
+}
+#mobile-controls.visible {
+  display: flex;
+}
+
+.btn.btn-mobile {
+  min-width: 56px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
+
+/* Pause overlay */
+#mobile-pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.62);
+  pointer-events: auto;
+}
+#mobile-pause-overlay.visible {
+  display: flex;
+}
+
+#mobile-pause-overlay .pause-card {
+  width: min(320px, calc(100vw - 32px));
+  background: rgba(0,0,0,0.85);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 18px;
+  text-align: center;
+}
+#mobile-pause-overlay .pause-title {
+  font-size: 20px;
+  margin-bottom: 12px;
+}

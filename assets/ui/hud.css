@@ -1033,3 +1033,45 @@ body {
     max-height: 60px;
   }
 }
+
+/* --- Mobile MVP additions (safe append) --- */
+/* Prevent scroll / rubber-banding. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+:root.mode-mobile body {
+  /* We capture gestures ourselves in #mobile-gesture-layer. */
+  touch-action: none;
+}
+
+.intensity {
+  width: 100%;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.intensity-label {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.intensity-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+.intensity-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #2bff88, #ffd84b, #ff4b2b);
+  box-shadow: 0 0 12px rgba(255, 90, 20, 0.35);
+  transition: width 120ms linear;
+}
+:root.mode-mobile .intensity {
+  padding: 8px 10px 10px;
+}

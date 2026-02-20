@@ -1,0 +1,37 @@
+# JigStack Mobile UI Performance Report (MVP)
+
+This report is a *procedure + checklist* for validating mobile UI performance without changing game logic.
+
+## Target Device Simulation
+- Use Chrome devtools:
+  - Performance tab CPU throttling (4× or 6×)
+  - Network throttling (Fast 3G optional)
+  - Rendering: emulate 30fps by watching frame times in Performance capture
+
+## What To Measure
+### 1) Frame time spikes
+- Watch for frames > 33ms (30fps budget)
+- Watch for bursts of frames > 50ms
+
+### 2) Layout / style thrash
+- Ensure HUD updates do not trigger large layout recalcs
+- CSS uses transforms/opacity where possible
+
+### 3) Input responsiveness
+- Tap zones should feel instant
+- No double-input
+- Soft-drop must always release
+## Known Risk Areas
+- DOM-heavy updates per tick
+- Unbounded event listeners
+- Scroll/rubber-banding causing repaint
+
+## Current Mitigations
+- Mobile mode hides heavy panels (leaderboard, how-to)
+- Gesture layer prevents camera gesture overhead
+- Inputs debounced centrally
+
+#TODO (If Perf Issues Found)
+- Cap update frequency for non-critical UI elements (e.g. intensity bar) to 10hz
+- Use requestAnimationFrame batching for DOM writes
+- Avoid textContent updates if value unchanged

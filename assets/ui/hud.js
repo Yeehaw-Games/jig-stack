@@ -219,8 +219,13 @@
   }
 
   function send(action) {
+    // Route through unified input layer when present (mobile + desktop).
+    if (window.JigStackInput && window.JigStackInput.sendAction) {
+      window.JigStackInput.sendAction(action);
+      return;
+    }
     if (typeof hytopia !== 'undefined' && hytopia.sendData) {
-      hytopia.sendData({ action });
+      hytopia.sendData({ action: action });
     }
   }
 
@@ -413,7 +418,18 @@
         if (statCombo) statCombo.classList.toggle('combo-active', data.comboCount > 0);
       }
     }
-
+// ——— Intensity bar (client-derived; do NOT change server gameplay). ———
+// Prefer stack height if present; otherwise approximate by level.
+var intensityFill = el('intensity-fill');
+if (intensityFill) {
+  var level = (data.level !== undefined ? data.level : (lastLevel !== undefined ? lastLevel : 1));
+  var stack = (data.stackHeight !== undefined ? data.stackHeight : lastStackHeight);
+  var rawI = 0;
+  if (typeof stack === 'number' && stack > 0) rawI = Math.max(rawI, stack / 18);
+  if (typeof level === 'number' && level > 0) rawI = Math.max(rawI, level / 16);
+  var pct = Math.max(0, Math.min(1, rawI)) * 100;
+  intensityFill.style.width = pct.toFixed(0) + '%';
+}
     // ——— Normalized status: gameover overlay, soundtrack, controls-hud visibility ———
     // Server sends RUNNING | GAME_OVER | ASSIGNING_PLOT | NO_PLOT; client uses playing | gameover | waiting
     if (data.status !== undefined) {
@@ -474,7 +490,11 @@
   if (typeof hytopia !== 'undefined' && hytopia.onData) {
     hytopia.onData(updateUI);
   }
-
+// Init mobile layout + touch controls (no-ops on desktop).
+try {
+  if (window.JigStackMobileLayout && window.JigStackMobileLayout.init) window.JigStackMobileLayout.init();
+  if (window.JigStackTouchControls && window.JigStackTouchControls.init) window.JigStackTouchControls.init();
+} catch (_) {}
   var buttons = document.querySelectorAll('.btn[data-action]');
   for (var i = 0; i < buttons.length; i++) {
     var btn = buttons[i];
@@ -567,6 +587,8 @@
   document.addEventListener('touchstart', onMutePointerDown, { capture: true, passive: false });
 
   document.addEventListener('keydown', function (e) {
+    if (window.JigStackInput && window.JigStackInput.isPaused && window.JigStackInput.isPaused()) return;
+    
     var key = e.key;
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') { send('left'); e.preventDefault(); }
     if (key === 'ArrowRight' || key === 'd' || key === 'D') { send('right'); e.preventDefault(); }
