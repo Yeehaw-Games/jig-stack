@@ -27,8 +27,8 @@
   var jigStackedUrl = assetsBase ? assetsBase + '/audio/jig-stacked.mp3' : '';
   /** In-game looping background music (play only when status is RUNNING). */
   var soundtrackUrl = assetsBase ? assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3' : '';
-  /** Main BGM playlist; use host-injected array if present, else single track. */
-  var soundtrackPlaylist = (typeof soundtrackPlaylist !== 'undefined' && Array.isArray(soundtrackPlaylist)) ? soundtrackPlaylist : (assetsBase ? [assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3'] : []);
+  /** Main BGM playlist; use host-injected array if present, else get-jiggy then female-latin (repeats). */
+  var soundtrackPlaylist = (typeof soundtrackPlaylist !== 'undefined' && Array.isArray(soundtrackPlaylist)) ? soundtrackPlaylist : (assetsBase ? [assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3', assetsBase + '/audio/female-latin-jigg-stack.mp3'] : []);
   var lineClearSoundUrl = assetsBase ? assetsBase + '/audio/line-clear.mp3' : '';
   /** One-shot when player clears exactly 2 lines. */
   var break2LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-2-lines.mp3' : '';
@@ -48,7 +48,7 @@
   var lastLevel = undefined;
 
   var soundtrackElements = [];
-  /** 0 = main (get-jiggy), 1 = intense (original). */
+  /** Current track index in playlist (sequential playback; wraps to 0 after last). */
   var currentSoundtrackIndex = 0;
   var fadeTimerId = null;
   var SOUNDTRACK_TARGET_VOLUME = 0.5;
@@ -69,14 +69,23 @@
 
   function getSoundtrackElements() {
     if (soundtrackElements.length === soundtrackPlaylist.length) return soundtrackElements;
-    for (var i = 0; i < soundtrackPlaylist.length; i++) {
+    var n = soundtrackPlaylist.length;
+    for (var i = 0; i < n; i++) {
       var url = soundtrackPlaylist[i];
       var audio = new window.Audio();
       audio.preload = 'auto';
-      audio.loop = true;
+      audio.loop = false;
       audio.volume = 0;
       audio.src = url;
       audio.load();
+      (function (idx) {
+        audio.addEventListener('ended', function onEnded() {
+          if (!shouldPlaySoundtrack() || n < 2) return;
+          var nextIndex = (idx + 1) % n;
+          currentSoundtrackIndex = nextIndex;
+          startTrackByIndex(soundtrackElements, nextIndex);
+        });
+      })(i);
       soundtrackElements.push(audio);
     }
     return soundtrackElements;
@@ -116,11 +125,12 @@
     }, 50);
   }
 
-  /** When stack height crosses threshold, crossfade between main and intense track. */
+  /** When stack height crosses threshold, crossfade between main and intense track (disabled for 2-track sequential playlist). */
   function applySoundtrackIntensity() {
     if (!shouldPlaySoundtrack()) return;
     var elements = getSoundtrackElements();
     if (elements.length < 2) return;
+    if (soundtrackPlaylist.length === 2) return;
     var wantIntense = lastStackHeight >= STACK_HEIGHT_INTENSE_THRESHOLD;
     var wantIndex = wantIntense ? 1 : 0;
     if (wantIndex !== currentSoundtrackIndex && fadeTimerId == null) {
@@ -165,14 +175,15 @@
   }
 
   function startTrackByIndex(elements, index) {
+    currentSoundtrackIndex = index;
     for (var i = 0; i < elements.length; i++) {
       if (i === index) {
         elements[i].currentTime = 0;
         elements[i].volume = SOUNDTRACK_TARGET_VOLUME;
         elements[i].play().catch(function () {
           if (elements.length > 1) {
-            currentSoundtrackIndex = index === 0 ? 1 : 0;
-            startTrackByIndex(elements, currentSoundtrackIndex);
+            var nextIndex = (index + 1) % elements.length;
+            startTrackByIndex(elements, nextIndex);
           }
         });
       } else {
