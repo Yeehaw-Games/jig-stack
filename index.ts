@@ -240,6 +240,10 @@ startServer((world: World) => {
 
     player.ui.on(PlayerUIEvent.DATA, ({ data }: { data: Record<string, unknown> }) => {
       const action = data?.action as string | undefined;
+      if (typeof action === 'string' && action === 'requestHud') {
+        sendHudToPlayer(player, getLeaderboardForHud(String(player.id)), noPlotPlayerIds.has(player.id), mutedMusicPlayerIds.has(player.id), mutedSfxPlayerIds.has(player.id));
+        return;
+      }
       if (typeof action !== 'string') return;
       if (action === 'toggleMusicMute') {
         if (mutedMusicPlayerIds.has(player.id)) mutedMusicPlayerIds.delete(player.id);

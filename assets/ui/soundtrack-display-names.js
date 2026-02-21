@@ -15,5 +15,8 @@ var soundtrackDisplayNames = {
   'ill-play-with-you-like-jigg-stack.mp3': "I'll Play With You",
   'my-favorite-game-is-jigg-stack.mp3': "My Favorite Game",
   'ill-ignore-the-world-to-play-jigg-stack.mp3': "Ignore the World",
-  'i-live-in-the-world-of-jigg-stack.mp3': "World of Jig Stack"
+  'i-live-in-the-world-of-jigg-stack.mp3': "World of Jig Stack",
+  'if-you-jigg-ill-jigg.mp3': "If You Jigg I'll Jigg",
+  'stack-jig-jig-jig-jig.mp3': "Stack Jig Jig Jig Jig",
+  'mr-jigg-stack.mp3': "Mr. Jigg Stack"
 };

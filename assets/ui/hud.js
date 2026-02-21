@@ -40,7 +40,10 @@
     assetsBase + '/audio/ill-play-with-you-like-jigg-stack.mp3',
     assetsBase + '/audio/my-favorite-game-is-jigg-stack.mp3',
     assetsBase + '/audio/ill-ignore-the-world-to-play-jigg-stack.mp3',
-    assetsBase + '/audio/i-live-in-the-world-of-jigg-stack.mp3'
+    assetsBase + '/audio/i-live-in-the-world-of-jigg-stack.mp3',
+    assetsBase + '/audio/if-you-jigg-ill-jigg.mp3',
+    assetsBase + '/audio/stack-jig-jig-jig-jig.mp3',
+    assetsBase + '/audio/mr-jigg-stack.mp3'
   ] : []);
   if (soundtrackPlaylist.length > 1) {
     for (var i = soundtrackPlaylist.length - 1; i > 0; i--) {
@@ -76,6 +79,8 @@
   var fadeTimerId = null;
   var SOUNDTRACK_TARGET_VOLUME = 0.5;
   var SOUNDTRACK_CROSSFADE_DURATION_MS = 1800;
+  /** Stack height (rows) above which to crossfade to "intense" track when using 2-track mode. */
+  var STACK_HEIGHT_INTENSE_THRESHOLD = 18;
   var lastStackHeight = 0;
 
   /** Derive a readable track title from a playlist URL. Uses soundtrackDisplayNames when available (see soundtrack-display-names.js). */
@@ -176,6 +181,11 @@
   var lastAppliedSfxMuted = undefined;
   /** Last normalized status (gameover = play game-over sound once). */
   var lastStatus = '';
+  /** Last known gameStarted/status from server so Start panel stays correct when payloads are partial (e.g. leaderboard-only). */
+  var lastKnownGameStarted = undefined;
+  var lastKnownServerStatus = '';
+  /** Once the user has started their first round (Start Game clicked), we never show the Start Game button again; new rounds are started via the game-over "Start New Game" button. */
+  var hasUserStartedGameOnce = false;
   /** Current SFX muted state (for future SFX: check before playing). */
   window.__tetrisSfxMuted = false;
 
@@ -434,11 +444,59 @@
     }, LEVEL_UP_MOMENT_DURATION_MS);
   }
 
+  /** Set window.DEBUG_NEXT_PIECE = true to log next-piece receive/update (checked at log time). */
+  function isDebugNextPiece() {
+    return typeof window !== 'undefined' && window.DEBUG_NEXT_PIECE;
+  }
+
+  /** Find a key anywhere in obj (one level deep) or in nested objects. Returns first value found. */
+  function findInPayload(obj, key) {
+    if (!obj || typeof obj !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(obj, key)) return obj[key];
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var v = obj[k];
+      if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, key)) return v[key];
+    }
+    return undefined;
+  }
+
+  /** Recursively search for nextPiece or next_piece in obj (max depth 4). */
+  function findNextPieceInPayload(obj, depth) {
+    if (depth > 4 || !obj || typeof obj !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(obj, 'nextPiece')) return obj.nextPiece;
+    if (Object.prototype.hasOwnProperty.call(obj, 'next_piece')) return obj.next_piece;
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var v = findNextPieceInPayload(obj[k], depth + 1);
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  }
+
+  var _hudPayloadLogCount = 0;
+
   function updateUI(data) {
+    if (!data || typeof data !== 'object') return;
     const el = function id(name) { return document.getElementById(name); };
-    // Some runtimes wrap server→client payload as { data: payload }; normalize so we always read from the inner payload.
+    // Keep raw reference so we can read nextPiece from top level or anywhere in payload.
+    var rawPayload = data;
+    // Some runtimes wrap server→client payload as { data: payload } or { payload: payload }; normalize so we always read from the inner payload.
     if (data && typeof data === 'object' && data.data != null && typeof data.data === 'object') {
       data = data.data;
+    }
+    if (data && typeof data === 'object' && data.payload != null && typeof data.payload === 'object') {
+      data = data.payload;
+    }
+    // If nextPiece was on the wrapper (e.g. { data: { score, level }, nextPiece: {...} }), merge it in so we don't lose it.
+    if (rawPayload && typeof rawPayload === 'object' && data && typeof data === 'object') {
+      if (data.nextPiece === undefined && Object.prototype.hasOwnProperty.call(rawPayload, 'nextPiece')) data.nextPiece = rawPayload.nextPiece;
+      if (data.next_piece === undefined && Object.prototype.hasOwnProperty.call(rawPayload, 'next_piece')) data.next_piece = rawPayload.next_piece;
+    }
+    // Last resort: search anywhere in raw payload for nextPiece/next_piece (JigStack may nest it).
+    if (data && (data.nextPiece === undefined && data.next_piece === undefined) && rawPayload) {
+      var found = findNextPieceInPayload(rawPayload, 0);
+      if (found !== undefined) data.nextPiece = found;
     }
     // Handle line-clear and piece-lock from main payload (single send) or legacy separate messages
     var lineClear = data.lineClearBurst || (data.type === 'lineClearBurst' ? { points: data.points, linesCleared: data.linesCleared, comboCount: data.comboCount } : null);
@@ -539,11 +597,6 @@
         } else {
           overlay.classList.remove('visible');
           overlay.setAttribute('aria-hidden', 'true');
-          // After restart (reset), show Start Game panel so the round can begin. Ensures panel is visible even if a later partial payload doesn't include gameStarted.
-          if (data.gameStarted === false) {
-            var startPanelAfterReset = document.getElementById('start-game-panel');
-            if (startPanelAfterReset) startPanelAfterReset.classList.remove('hidden');
-          }
         }
       }
       applySoundtrackForStatus(status, lastAppliedMusicMuted === true);
@@ -551,21 +604,26 @@
       applySoundtrackIntensity();
     }
 
-    // ——— Start Game panel (right-side HUD): visible when game not started or when game over (so player can start a new round); hidden only during active play. ———
-    // Show when game hasn't started (gameStarted === false) or when status is game over; hide only while a round is running.
-    var serverStatus = data.serverStatus !== undefined ? data.serverStatus : data.status;
+    // ——— Persist game state so Start panel visibility stays correct when payloads are partial (e.g. leaderboard-only). ———
+    if (data.gameStarted !== undefined) {
+      lastKnownGameStarted = data.gameStarted;
+      if (data.gameStarted === true) hasUserStartedGameOnce = true;
+    }
+    if (data.serverStatus !== undefined || data.status !== undefined) {
+      lastKnownServerStatus = data.serverStatus !== undefined ? data.serverStatus : data.status;
+    }
+    // ——— Start Game panel: visible only on initial load before first round; once clicked it never reappears. New rounds are started via the game-over "Start New Game" button. ———
     var startPanel = document.getElementById('start-game-panel');
-    if (startPanel && (data.gameStarted !== undefined || data.serverStatus !== undefined || data.status !== undefined)) {
-      var isGameOver = serverStatus === 'GAME_OVER';
-      var showStart = (data.gameStarted === false || isGameOver) && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT';
+    if (startPanel) {
+      var showStart = !hasUserStartedGameOnce && lastKnownGameStarted !== true && lastKnownServerStatus !== 'NO_PLOT' && lastKnownServerStatus !== 'ASSIGNING_PLOT';
       if (showStart) startPanel.classList.remove('hidden'); else startPanel.classList.add('hidden');
     }
 
     // ——— Server-only hint (NO_PLOT / ASSIGNING_PLOT). ———
     var hintEl = document.getElementById('hint-server-message');
-    if (serverStatus === 'NO_PLOT') {
+    if (lastKnownServerStatus === 'NO_PLOT') {
       if (hintEl) { hintEl.textContent = 'All plots full. Wait for a free plot.'; hintEl.classList.remove('hidden'); }
-    } else if (serverStatus === 'ASSIGNING_PLOT') {
+    } else if (lastKnownServerStatus === 'ASSIGNING_PLOT') {
       if (hintEl) { hintEl.textContent = 'Assigning plot…'; hintEl.classList.remove('hidden'); }
     } else if (hintEl) {
       hintEl.classList.add('hidden');
@@ -573,20 +631,53 @@
 
     // ——— Next piece preview (right side under leaderboard). Only update when payload includes next piece so partial payloads (e.g. leaderboard-only) don't clear the preview. Support both camelCase and snake_case. ———
     var nextPiecePayload = Object.prototype.hasOwnProperty.call(data, 'nextPiece') ? data.nextPiece : (Object.prototype.hasOwnProperty.call(data, 'next_piece') ? data.next_piece : undefined);
-    if (nextPiecePayload !== undefined) {
-      var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
-      if (NextPreview) {
-        if (NextPreview.ensureGridInited) NextPreview.ensureGridInited();
-        NextPreview.update(nextPiecePayload);
+
+    // Diagnostic: log first 2 payloads to console so we can see what JigStack sends; show on-screen panel when window.DEBUG_HUD_PAYLOAD is true.
+    _hudPayloadLogCount++;
+    if (_hudPayloadLogCount <= 2 && typeof console !== 'undefined' && console.log) {
+      console.log('[HUD] payload #' + _hudPayloadLogCount + ' keys:', data ? Object.keys(data) : []);
+      console.log('[HUD] nextPiece in data:', data && (data.nextPiece !== undefined || data.next_piece !== undefined) ? (data.nextPiece || data.next_piece) : 'MISSING');
+    }
+    if (typeof window !== 'undefined' && window.DEBUG_HUD_PAYLOAD) {
+      var debugEl = document.getElementById('hud-next-piece-debug');
+      if (!debugEl) {
+        debugEl = document.createElement('div');
+        debugEl.id = 'hud-next-piece-debug';
+        debugEl.setAttribute('aria-live', 'polite');
+        debugEl.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;max-height:120px;overflow:auto;background:rgba(0,0,0,0.9);color:#0f0;font:12px monospace;padding:8px;z-index:99999;border:1px solid #0f0;';
+        document.body.appendChild(debugEl);
       }
-      // Direct DOM update so next piece always displays even if NextPreview component is missing or fails (e.g. load order in Hytopia).
-      renderNextPieceGrid(nextPiecePayload);
+      var keys = data ? Object.keys(data).join(', ') : '(no data)';
+      var nextStr = nextPiecePayload === undefined ? 'MISSING' : (nextPiecePayload == null ? 'null' : 'type=' + (nextPiecePayload.type || '?'));
+      var gridExists = !!document.getElementById('next-preview-grid');
+      debugEl.textContent = 'Keys: ' + keys + ' | nextPiece: ' + nextStr + ' | grid exists: ' + gridExists;
+    }
+
+    if (nextPiecePayload !== undefined) {
+      if (isDebugNextPiece() && typeof console !== 'undefined' && console.log) {
+        console.log('[HUD] next piece received:', nextPiecePayload ? { type: nextPiecePayload.type } : null);
+      }
+      // Don't clear the preview when server sends null but game is RUNNING (e.g. no-instance/idle payload); avoid wiping a valid-looking board.
+      var running = data.status === 'RUNNING' || lastKnownServerStatus === 'RUNNING';
+      if (nextPiecePayload == null && running) {
+        if (typeof console !== 'undefined' && console.error) {
+          console.error('[HUD] Next piece null while RUNNING — skipping clear (no instance?).');
+        }
+      } else {
+        var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
+        if (NextPreview) {
+          if (NextPreview.ensureGridInited) NextPreview.ensureGridInited();
+          NextPreview.update(nextPiecePayload);
+        }
+        // Direct DOM update so next piece always displays even if NextPreview component is missing or fails (e.g. load order in Hytopia).
+        renderNextPieceGrid(nextPiecePayload);
+      }
     }
 
     // ——— Next preview panel: show whenever we have a plot (not NO_PLOT / ASSIGNING_PLOT) so the next piece can display. ———
     var nextPreviewPanel = document.getElementById('next-preview-container');
-    if (nextPreviewPanel && (data.gameStarted !== undefined || nextPiecePayload !== undefined || serverStatus !== undefined)) {
-      var hideNextPreview = serverStatus === 'NO_PLOT' || serverStatus === 'ASSIGNING_PLOT';
+    if (nextPreviewPanel && (data.gameStarted !== undefined || nextPiecePayload !== undefined || lastKnownServerStatus !== undefined)) {
+      var hideNextPreview = lastKnownServerStatus === 'NO_PLOT' || lastKnownServerStatus === 'ASSIGNING_PLOT';
       if (hideNextPreview) nextPreviewPanel.classList.add('hidden'); else nextPreviewPanel.classList.remove('hidden');
     }
   }
@@ -618,6 +709,10 @@
 
   if (typeof hytopia !== 'undefined' && hytopia.onData) {
     hytopia.onData(updateUI);
+    // Request initial HUD so we get nextPiece even if first tick was delivered before onData was registered (e.g. JigStack).
+    if (typeof hytopia.sendData === 'function') {
+      hytopia.sendData({ action: 'requestHud' });
+    }
   }
 // Init mobile layout + touch controls (no-ops on desktop).
 try {
@@ -635,6 +730,11 @@ try {
       playButtonClickSound();
       var a = this.getAttribute('data-action');
       if (a === 'start' || a === 'reset') startSoundtrackFromUserGesture();
+      if (a === 'start') {
+        hasUserStartedGameOnce = true;
+        var p = document.getElementById('start-game-panel');
+        if (p) p.classList.add('hidden');
+      }
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
     });
@@ -655,6 +755,11 @@ try {
       playButtonClickSound();
       var a = this.getAttribute('data-action');
       if (a === 'start' || a === 'reset') startSoundtrackFromUserGesture();
+      if (a === 'start') {
+        hasUserStartedGameOnce = true;
+        var p = document.getElementById('start-game-panel');
+        if (p) p.classList.add('hidden');
+      }
       send(a);
       if (a === 'softDropDown') this._softDropSent = true;
     }, { passive: false });

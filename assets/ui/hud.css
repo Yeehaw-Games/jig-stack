@@ -311,13 +311,13 @@ body {
   background: rgba(50, 200, 90, 0.95);
 }
 
-/* ——— Leaderboard panel (top-right; also shown in-world on monitor when SceneUI loads) ——— */
+/* ——— Leaderboard panel (top-right; includes NEXT piece at bottom; also shown in-world on monitor when SceneUI loads) ——— */
 .leaderboard-panel {
   position: fixed;
   right: max(12px, env(safe-area-inset-right));
   top: max(12px, env(safe-area-inset-top));
   width: min(280px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
+  max-height: min(calc(100vh - 24px), 320px);
   padding: 12px 14px;
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(10px);
@@ -330,6 +330,7 @@ body {
   flex-direction: column;
   gap: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 10;
 }
 
 .leaderboard-header {
@@ -506,6 +507,13 @@ body {
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.leaderboard-panel .next-preview-panel {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .leaderboard-row {
@@ -758,16 +766,17 @@ body {
   }
 }
 
-/* ——— Right column: next piece + controls, underneath leaderboard ——— */
+/* ——— Right column: controls (how to play, now playing, sound); leaderboard + NEXT are one panel above ——— */
 .hud-right-stack {
   position: fixed;
   right: max(12px, env(safe-area-inset-right));
-  top: 140px;
+  top: 340px;
   width: min(280px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
   gap: 12px;
   pointer-events: auto;
+  z-index: 11;
 }
 
 .next-preview-panel {
@@ -891,9 +900,13 @@ body {
 
 /* ——— Responsiveness: 16:9 desktop, no overflow on mobile ——— */
 @media (max-width: 480px) {
+  .leaderboard-panel {
+    max-height: min(calc(100vh - 24px), 280px);
+  }
+
   .hud-right-stack {
     right: 8px;
-    top: 140px;
+    top: 295px;
     width: min(260px, calc(100vw - 16px));
   }
 
@@ -986,7 +999,7 @@ body {
     right: max(8px, env(safe-area-inset-right));
     top: max(8px, env(safe-area-inset-top));
     width: min(240px, calc(100vw - 16px));
-    max-height: calc(100vh - 16px);
+    max-height: min(calc(100vh - 16px), 260px);
     padding: 8px 10px;
     font-size: 0.8rem;
   }
@@ -1004,7 +1017,7 @@ body {
 
   .hud-right-stack {
     right: max(8px, env(safe-area-inset-right));
-    top: 140px;
+    top: 275px;
     width: min(240px, calc(100vw - 16px));
     gap: 8px;
   }
@@ -1139,12 +1152,12 @@ body {
 /* Target ~844×390: short viewport with enough width */
 @media (max-height: 390px) {
   .hud-right-stack {
-    top: 120px;
+    top: 215px;
     gap: 6px;
   }
 
   .leaderboard-panel {
-    max-height: 110px;
+    max-height: 200px;
   }
 
   .leaderboard-rows {

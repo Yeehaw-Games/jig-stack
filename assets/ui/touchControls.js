@@ -66,7 +66,7 @@
       hud.appendChild(bar);
     }
     rotateBtn = document.getElementById('btn-mobile-rotate');
-    hardDropBtn = docgetElementById('btn-mobile-harddrop');
+    hardDropBtn = document.getElementById('btn-mobile-harddrop');
 
     // Pause overlay
     if (!document.getElementById('mobile-pause-overlay')) {

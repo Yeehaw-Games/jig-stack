@@ -276,8 +276,10 @@ export class GameInstance {
   handleAction(action: InputAction | null, softDropActive: boolean): void {
     this.state.softDropActive = softDropActive;
     if (action === 'reset') {
+      const wasGameOver = this.state.gameStatus === 'GAME_OVER';
       resetState(this.state);
-      this.gameStarted = false;
+      // From game-over screen "Start New Game" = reset and start the new round immediately. Otherwise just reset.
+      this.gameStarted = wasGameOver;
       this.dirty = true;
       return;
     }

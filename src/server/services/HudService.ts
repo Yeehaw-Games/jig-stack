@@ -9,6 +9,11 @@ import type { LeaderboardPayload } from '../schema/hudMessages.js';
 import { getInstanceByPlayer } from '../game/InstanceRegistry.js';
 import { getPieceMatrix, getPieceTypeLetter, getStackHeight } from '../systems/TetrisSystem.js';
 
+/** When true, log next-piece payload and state for debugging. Set via DEBUG_NEXT_PIECE env. */
+const DEBUG_NEXT_PIECE = process.env.DEBUG_NEXT_PIECE === '1' || process.env.DEBUG_NEXT_PIECE === 'true';
+
+const _loggedNoInstancePlayerIds = new Set<string>();
+
 /** Next piece for HUD preview: type letter (I,O,T,S,Z,J,L) and 4x4 matrix. */
 export interface NextPiecePayload {
   type: string;
@@ -56,8 +61,20 @@ export function buildHudPayload(
       type: getPieceTypeLetter(state.nextPiece.type),
       matrix: getPieceMatrix(state.nextPiece.type, state.nextPiece.rotation),
     };
+  } else if (state.gameStatus === 'RUNNING' && !state.nextPiece) {
+    // Guard: RUNNING should always have nextPiece; avoid sending null so HUD does not clear incorrectly.
+    if (typeof console !== 'undefined' && console.error) {
+      console.error('[HudService] Next piece undefined while RUNNING — queue invariant broken. Using fallback.');
+    }
+    payload.nextPiece = {
+      type: 'T',
+      matrix: getPieceMatrix(3, 0),
+    };
   } else {
     payload.nextPiece = null;
+  }
+  if (DEBUG_NEXT_PIECE && typeof console !== 'undefined' && console.log) {
+    console.log('[HudService] nextPiece payload:', payload.nextPiece ? { type: payload.nextPiece.type } : null);
   }
   return payload;
 }
@@ -92,6 +109,14 @@ export function sendHudToPlayer(
   sfxMuted?: boolean
 ): void {
   const instance = getInstanceByPlayer(player.id);
+  if (!instance && !noPlot) {
+    if (!_loggedNoInstancePlayerIds.has(player.id)) {
+      _loggedNoInstancePlayerIds.add(player.id);
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('[HudService] No instance for player', player.id, '- nextPiece will be null. Check InstanceRegistry / assignPlot.');
+      }
+    }
+  }
   const payload = instance
     ? instance.getHudPayload(leaderboard)
     : idleHudPayload(leaderboard, noPlot);
