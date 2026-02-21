@@ -433,16 +433,19 @@
 
   function updateUI(data) {
     const el = function id(name) { return document.getElementById(name); };
-    if (data.type === 'lineClearBurst') {
-      showScoreBurst(data.points, data.linesCleared);
-      if (data.comboCount >= 1) showComboBurst(data.comboCount);
-      if (data.linesCleared === 4 && typeof confetti === 'function') {
+    // Handle line-clear and piece-lock from main payload (single send) or legacy separate messages
+    var lineClear = data.lineClearBurst || (data.type === 'lineClearBurst' ? { points: data.points, linesCleared: data.linesCleared, comboCount: data.comboCount } : null);
+    if (lineClear && lineClear.linesCleared > 0) {
+      showScoreBurst(lineClear.points, lineClear.linesCleared);
+      if (lineClear.comboCount >= 1) showComboBurst(lineClear.comboCount);
+      if (lineClear.linesCleared === 4 && typeof confetti === 'function') {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
       }
-      /* Fall through so merged payloads still update score/level/lines */
     }
-    if (data.type === 'pieceLock') {
+    if (data.pieceLock === true || data.type === 'pieceLock') {
       playBlockLandSound();
+    }
+    if (data.type === 'pieceLock' && !lineClear) {
       return;
     }
     if (data.stackHeight !== undefined) lastStackHeight = data.stackHeight;
@@ -529,6 +532,11 @@
         } else {
           overlay.classList.remove('visible');
           overlay.setAttribute('aria-hidden', 'true');
+          // After restart (reset), show Start Game panel so the round can begin. Ensures panel is visible even if a later partial payload doesn't include gameStarted.
+          if (data.gameStarted === false) {
+            var startPanelAfterReset = document.getElementById('start-game-panel');
+            if (startPanelAfterReset) startPanelAfterReset.classList.remove('hidden');
+          }
         }
       }
       applySoundtrackForStatus(status, lastAppliedMusicMuted === true);
@@ -538,9 +546,9 @@
 
     // ——— Start Game panel (right-side HUD): visible only when game not started; hide during play and after game over until they click Start New Game. ———
     // Only show when we explicitly know the game hasn't started (gameStarted === false). If gameStarted is undefined (e.g. in partial payloads), don't change visibility to avoid a brief flash during gameplay.
-    var serverStatus = data.serverStatus;
+    var serverStatus = data.serverStatus !== undefined ? data.serverStatus : data.status;
     var startPanel = document.getElementById('start-game-panel');
-    if (startPanel && (data.gameStarted !== undefined || data.serverStatus !== undefined)) {
+    if (startPanel && (data.gameStarted !== undefined || data.serverStatus !== undefined || data.status !== undefined)) {
       var showStart = data.gameStarted === false && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT';
       if (showStart) startPanel.classList.remove('hidden'); else startPanel.classList.add('hidden');
     }
@@ -559,7 +567,18 @@
     var nextPiecePayload = Object.prototype.hasOwnProperty.call(data, 'nextPiece') ? data.nextPiece : (Object.prototype.hasOwnProperty.call(data, 'next_piece') ? data.next_piece : undefined);
     if (nextPiecePayload !== undefined) {
       var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
-      if (NextPreview) NextPreview.update(nextPiecePayload);
+      if (NextPreview) {
+        if (NextPreview.ensureGridInited) NextPreview.ensureGridInited();
+        NextPreview.update(nextPiecePayload);
+      }
+    }
+
+    // ——— Next preview panel: visible when game has started or when we have valid next piece data. Only change visibility when this payload has game state or next piece so partial payloads (e.g. leaderboard-only) don't hide the panel. ———
+    var nextPreviewPanel = document.getElementById('next-preview-container');
+    if (nextPreviewPanel && (data.gameStarted !== undefined || nextPiecePayload !== undefined)) {
+      var hasValidNextPiece = nextPiecePayload && nextPiecePayload.type && nextPiecePayload.matrix;
+      var showNextPreview = hasValidNextPiece || (data.gameStarted === true && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT');
+      if (showNextPreview) nextPreviewPanel.classList.remove('hidden'); else nextPreviewPanel.classList.add('hidden');
     }
   }
 

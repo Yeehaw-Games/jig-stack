@@ -32,22 +32,24 @@
       <div class="leaderboard-rows" id="leaderboard-rows"></div>
     </div>
     <div class="top" id="solo-top">
-      <div class="hud-center">
-        <div class="stats" id="score-bar-container">
-          <div class="stat"><span class="label">Score</span><span id="score" data-prev="0">0</span></div>
-          <div class="stat"><span class="label">Level</span><span id="level" data-prev="1">1</span></div>
-          <div class="stat"><sn class="label">Lines</span><span id="lines" data-prev="0">0</span></div>
-          <div class="stat"><span class="label">Combo</span><span id="combo" data-prev="0">—</span></div>
+      <div class="top-bar-row">
+        <div class="hud-center">
+          <div class="stats" id="score-bar-container">
+            <div class="stat"><span class="label">Score</span><span id="score" data-prev="0">0</span></div>
+            <div class="stat"><span class="label">Level</span><span id="level" data-prev="1">1</span></div>
+            <div class="stat"><span class="label">Lines</span><span id="lines" data-prev="0">0</span></div>
+            <div class="stat"><span class="label">Combo</span><span id="combo" data-prev="0">—</span></div>
+          </div>
+        </div>
+        <div class="start-game-panel" id="start-game-panel" aria-label="Start game">
+          <button type="button" class="btn btn-start-game" id="btn-start-game" data-action="start" aria-label="Start game">Start Game</button>
         </div>
       </div>
       <p class="hint hint-server-only hidden" id="hint-server-message"></p>
     </div>
 
-    <!-- Right column: start game, next piece, how to play (same HUD strip under leaderboard) -->
+    <!-- Right column: next piece, how to play (under leaderboard) -->
     <div class="hud-right-stack">
-      <div class="start-game-panel" id="start-game-panel" aria-label="Start game">
-        <button type="button" class="btn btn-start-game" id="btn-start-game" data-action="start" aria-label="Start game">Start Game</button>
-      </div>
       <div class="next-preview-panel" id="next-preview-container" aria-label="Next piece">
         <div class="next-preview-title">NEXT</div>
         <div class="next-preview-grid" id="next-preview-grid"></div>

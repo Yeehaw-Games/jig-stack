@@ -55,17 +55,32 @@ body {
   position: relative;
 }
 
+/* Top bar row: score bar + Start Game button side by side */
+.top-bar-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: calc(var(--stats-max-width) + 180px);
+  margin: 0 auto;
+}
+
 /* Single centered block: score bar + controls under it */
 .hud-center {
   width: 100%;
   max-width: var(--stats-max-width);
-  margin: 0 auto;
+  margin: 0;
   background: rgba(0, 0, 0, 0.75);
   border-radius: 10px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .btn-mute {
@@ -261,10 +276,11 @@ body {
   transform: scale(0.96);
 }
 
-/* ——— Start Game panel (right-side HUD): same strip as Next / How to play ——— */
+/* ——— Start Game panel (top bar, next to score bar) ——— */
 .start-game-panel {
-  width: 100%;
-  padding: 16px 14px;
+  flex: 0 0 auto;
+  min-width: 140px;
+  padding: 12px 20px;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -384,6 +400,56 @@ body {
 
 .audio-controls-panel .btn-mute.muted {
   opacity: 0.7;
+}
+
+/* ——— Mini player (Now playing): same glass window as other right-stack panels ——— */
+.mini-player-panel {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mini-player-panel .mini-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mini-player-panel .btn-miniplayer {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: #fff;
+}
+
+.mini-player-panel .btn-miniplayer:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.mini-player-panel .btn-miniplayer:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.mini-player-panel .miniplayer-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mini-player-panel .btn-miniplayer:disabled {
@@ -696,7 +762,7 @@ body {
 .hud-right-stack {
   position: fixed;
   right: max(12px, env(safe-area-inset-right));
-  top: 260px;
+  top: 140px;
   width: min(280px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
@@ -717,6 +783,10 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+}
+
+.next-preview-panel.hidden {
+  display: none !important;
 }
 
 .next-preview-title {
@@ -823,7 +893,7 @@ body {
 @media (max-width: 480px) {
   .hud-right-stack {
     right: 8px;
-    top: 240px;
+    top: 140px;
     width: min(260px, calc(100vw - 16px));
   }
 

@@ -27,6 +27,12 @@ export interface HudPayload {
   leaderboard?: LeaderboardPayload;
   /** Next piece for preview panel; only when game is running and next piece exists. */
   nextPiece?: NextPiecePayload | null;
+  /** Optional raw server status for NO_PLOT / ASSIGNING_PLOT; client uses for Start panel and hints. */
+  serverStatus?: string;
+  /** When present, client plays line-clear SFX and shows score burst (ordering guaranteed with pieceLock). */
+  lineClearBurst?: { points: number; linesCleared: number; comboCount: number };
+  /** When true, client plays block-land SFX. Sent in same payload as lineClearBurst when both occur. */
+  pieceLock?: boolean;
 }
 
 export function buildHudPayload(
@@ -40,6 +46,7 @@ export function buildHudPayload(
     lines: state.lines,
     comboCount: state.comboCount,
     status: state.gameStatus,
+    serverStatus: state.gameStatus,
     gameStarted,
     stackHeight: getStackHeight(state.board),
   };
@@ -63,6 +70,7 @@ function idleHudPayload(leaderboard?: LeaderboardPayload, noPlot?: boolean): Hud
     lines: 0,
     comboCount: 0,
     status: noPlot ? 'NO_PLOT' : 'ASSIGNING_PLOT',
+    serverStatus: noPlot ? 'NO_PLOT' : 'ASSIGNING_PLOT',
     gameStarted: false,
     stackHeight: 0,
     nextPiece: null,
@@ -74,7 +82,7 @@ function idleHudPayload(leaderboard?: LeaderboardPayload, noPlot?: boolean): Hud
 /**
  * Send HUD to this player. Routing: payload comes from their plot instance.
  * If no instance, sends idle state (ASSIGNING_PLOT or NO_PLOT when all plots full).
- * When instance has a pending line-clear burst, sends that first then clears it.
+ * Line-clear burst and piece-lock are included in the single payload so SFX ordering is guaranteed.
  */
 export function sendHudToPlayer(
   player: Player,
@@ -89,22 +97,18 @@ export function sendHudToPlayer(
     : idleHudPayload(leaderboard, noPlot);
   if (musicMuted !== undefined) payload.musicMuted = musicMuted;
   if (sfxMuted !== undefined) payload.sfxMuted = sfxMuted;
-  player.ui.sendData(payload);
 
   if (instance?.pendingLineClearBurst) {
     const { points, linesCleared, comboCount } = instance.pendingLineClearBurst;
-    player.ui.sendData({
-      type: 'lineClearBurst',
-      points,
-      linesCleared,
-      comboCount,
-    });
+    payload.lineClearBurst = { points, linesCleared, comboCount };
     instance.pendingLineClearBurst = null;
   }
   if (instance?.pendingPieceLock) {
-    player.ui.sendData({ type: 'pieceLock' });
+    payload.pieceLock = true;
     instance.pendingPieceLock = false;
   }
+
+  player.ui.sendData(payload);
 }
 
 /** Send only leaderboard payload (e.g. periodic broadcast or after score submit). */

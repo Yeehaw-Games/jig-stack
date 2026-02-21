@@ -33,7 +33,8 @@
       for (var col = 0; col < GRID_SIZE; col++) {
         var cell = document.createElement('div');
         cell.className = 'next-preview-cell';
-        if (matrix && matrix[row] && matrix[row][col]) {
+        var val = matrix && matrix[row] && matrix[row][col];
+        if (val !== undefined && val !== null && val !== 0 && val !== '0') {
           cell.classList.add('filled', cls);
         }
         container.appendChild(cell);
