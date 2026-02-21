@@ -27,8 +27,29 @@
   var jigStackedUrl = assetsBase ? assetsBase + '/audio/jig-stacked.mp3' : '';
   /** In-game looping background music (play only when status is RUNNING). */
   var soundtrackUrl = assetsBase ? assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3' : '';
-  /** Main BGM playlist; use host-injected array if present, else get-jiggy then female-latin (repeats). */
-  var soundtrackPlaylist = (typeof soundtrackPlaylist !== 'undefined' && Array.isArray(soundtrackPlaylist)) ? soundtrackPlaylist : (assetsBase ? [assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3', assetsBase + '/audio/female-latin-jigg-stack.mp3'] : []);
+  /** Main BGM playlist; use host-injected array if present, else the following (repeats in order). */
+  var soundtrackPlaylist = (typeof soundtrackPlaylist !== 'undefined' && Array.isArray(soundtrackPlaylist)) ? soundtrackPlaylist : (assetsBase ? [
+    assetsBase + '/audio/get-jiggy-with-jigg-stack.mp3',
+    assetsBase + '/audio/female-latin-jigg-stack.mp3',
+    assetsBase + '/audio/jigg-stack.mp3',
+    assetsBase + '/audio/never-stop-stackin.mp3',
+    assetsBase + '/audio/jam-to-the-jigg-stack.mp3',
+    assetsBase + '/audio/jigggggg-stack.mp3',
+    assetsBase + '/audio/i-think-thats-how-my-mom-met-my-dad-jigg-stack.mp3',
+    assetsBase + '/audio/ive-gotten-jigged-by-a-stack.mp3',
+    assetsBase + '/audio/ill-play-with-you-like-jigg-stack.mp3',
+    assetsBase + '/audio/my-favorite-game-is-jigg-stack.mp3',
+    assetsBase + '/audio/ill-ignore-the-world-to-play-jigg-stack.mp3',
+    assetsBase + '/audio/i-live-in-the-world-of-jigg-stack.mp3'
+  ] : []);
+  if (soundtrackPlaylist.length > 1) {
+    for (var i = soundtrackPlaylist.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = soundtrackPlaylist[i];
+      soundtrackPlaylist[i] = soundtrackPlaylist[j];
+      soundtrackPlaylist[j] = t;
+    }
+  }
   var lineClearSoundUrl = assetsBase ? assetsBase + '/audio/line-clear.mp3' : '';
   /** One-shot when player clears exactly 2 lines. */
   var break2LinesSoundUrl = assetsBase ? assetsBase + '/audio/break-2-lines.mp3' : '';
@@ -50,10 +71,20 @@
   var soundtrackElements = [];
   /** Current track index in playlist (sequential playback; wraps to 0 after last). */
   var currentSoundtrackIndex = 0;
+  /** User-initiated pause (independent of mute); when true, current track is paused. */
+  var soundtrackPaused = false;
   var fadeTimerId = null;
   var SOUNDTRACK_TARGET_VOLUME = 0.5;
   var SOUNDTRACK_CROSSFADE_DURATION_MS = 1800;
   var lastStackHeight = 0;
+
+  /** Derive a readable track title from a playlist URL (e.g. never-stop-stackin.mp3 -> "Never Stop Stackin"). */
+  function urlToDisplayName(url) {
+    if (!url || typeof url !== 'string') return '—';
+    var name = url.replace(/^.*\//, '').replace(/\.mp3$/i, '').replace(/-/g, ' ');
+    if (!name) return '—';
+    return name.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
 
   function shouldPlaySoundtrack() {
     var isRunning = lastStatus === 'playing' || lastStatus === 'RUNNING';
@@ -149,7 +180,29 @@
     var elements = getSoundtrackElements();
     for (var i = 0; i < elements.length; i++) elements[i].pause();
     if (muted) cancelFade();
+    updateMiniPlayerUI();
     /* When unmuted, playback is started only when status is RUNNING (see applySoundtrackForStatus). */
+  }
+
+  /** Sync mini player UI: title, Pause/Play button label, Next button enabled state. */
+  function updateMiniPlayerUI() {
+    var titleEl = document.getElementById('miniplayer-title');
+    var pauseBtn = document.getElementById('btn-miniplayer-pause');
+    var nextBtn = document.getElementById('btn-miniplayer-next');
+    var n = soundtrackPlaylist.length;
+    var displayName = n > 0 && currentSoundtrackIndex >= 0 && currentSoundtrackIndex < n
+      ? urlToDisplayName(soundtrackPlaylist[currentSoundtrackIndex])
+      : '—';
+    if (titleEl) titleEl.textContent = displayName;
+    var isPaused = soundtrackPaused || lastAppliedMusicMuted === true;
+    if (pauseBtn) {
+      pauseBtn.textContent = isPaused ? 'Play' : 'Pause';
+      pauseBtn.setAttribute('aria-label', isPaused ? 'Play' : 'Pause');
+    }
+    if (nextBtn) {
+      nextBtn.disabled = n < 2;
+      nextBtn.setAttribute('aria-disabled', n < 2 ? 'true' : 'false');
+    }
   }
 
   /** Play game-over sequence: game-over sound → game-over voice → jig stacked (respects SFX mute). */
@@ -175,22 +228,51 @@
   }
 
   function startTrackByIndex(elements, index) {
+    var el = (elements && elements.length) ? elements : getSoundtrackElements();
+    if (!el.length) return;
     currentSoundtrackIndex = index;
-    for (var i = 0; i < elements.length; i++) {
+    soundtrackPaused = false;
+    for (var i = 0; i < el.length; i++) {
       if (i === index) {
-        elements[i].currentTime = 0;
-        elements[i].volume = SOUNDTRACK_TARGET_VOLUME;
-        elements[i].play().catch(function () {
-          if (elements.length > 1) {
-            var nextIndex = (index + 1) % elements.length;
-            startTrackByIndex(elements, nextIndex);
+        el[i].currentTime = 0;
+        el[i].volume = SOUNDTRACK_TARGET_VOLUME;
+        el[i].play().catch(function () {
+          if (el.length > 1) {
+            var nextIndex = (index + 1) % el.length;
+            startTrackByIndex(el, nextIndex);
           }
         });
       } else {
-        elements[i].pause();
-        elements[i].volume = 0;
+        el[i].pause();
+        el[i].volume = 0;
       }
     }
+    updateMiniPlayerUI();
+  }
+
+  /** Next track: stop current, advance index, start next. Call from Next button or N key. */
+  function goToNextTrack() {
+    var elements = getSoundtrackElements();
+    if (elements.length < 2) return;
+    var currentEl = elements[currentSoundtrackIndex];
+    if (currentEl) currentEl.pause();
+    playButtonClickSound();
+    soundtrackPaused = false;
+    var nextIndex = (currentSoundtrackIndex + 1) % elements.length;
+    startTrackByIndex(elements, nextIndex);
+  }
+
+  /** Toggle pause/play for mini player. Call from Pause button or P key. */
+  function toggleMiniPlayerPause() {
+    playButtonClickSound();
+    var elements = getSoundtrackElements();
+    var currentEl = elements.length > 0 && currentSoundtrackIndex >= 0 && currentSoundtrackIndex < elements.length ? elements[currentSoundtrackIndex] : null;
+    soundtrackPaused = !soundtrackPaused;
+    if (currentEl) {
+      if (soundtrackPaused) currentEl.pause();
+      else if (lastAppliedMusicMuted !== true) currentEl.play().catch(function () {});
+    }
+    updateMiniPlayerUI();
   }
 
   /** Start soundtrack from a user gesture (e.g. Start Game click) so the browser allows play(). */
@@ -208,9 +290,12 @@
     var isPlaying = (status === 'playing' || status === 'RUNNING') && !musicMuted;
     if (isPlaying) {
       cancelFade();
-      var wantIntense = typeof STACK_HEIGHT_INTENSE_THRESHOLD === 'number' && lastStackHeight >= STACK_HEIGHT_INTENSE_THRESHOLD;
-      var idx = wantIntense ? 1 : 0;
-      currentSoundtrackIndex = idx;
+      // Only force track index 0/1 when using 2-track intensity mode (main vs intense). With a multi-track playlist, leave currentSoundtrackIndex alone so N and auto-advance work.
+      if (soundtrackPlaylist.length < 2) {
+        var wantIntense = typeof STACK_HEIGHT_INTENSE_THRESHOLD === 'number' && lastStackHeight >= STACK_HEIGHT_INTENSE_THRESHOLD;
+        var idx = wantIntense ? 1 : 0;
+        currentSoundtrackIndex = idx;
+      }
       // Soundtrack starts only from user gesture (Start Game / Start New Game), not from server payload.
     } else {
       for (var i = 0; i < elements.length; i++) elements[i].pause();
@@ -418,18 +503,6 @@
         if (statCombo) statCombo.classList.toggle('combo-active', data.comboCount > 0);
       }
     }
-// ——— Intensity bar (client-derived; do NOT change server gameplay). ———
-// Prefer stack height if present; otherwise approximate by level.
-var intensityFill = el('intensity-fill');
-if (intensityFill) {
-  var level = (data.level !== undefined ? data.level : (lastLevel !== undefined ? lastLevel : 1));
-  var stack = (data.stackHeight !== undefined ? data.stackHeight : lastStackHeight);
-  var rawI = 0;
-  if (typeof stack === 'number' && stack > 0) rawI = Math.max(rawI, stack / 18);
-  if (typeof level === 'number' && level > 0) rawI = Math.max(rawI, level / 16);
-  var pct = Math.max(0, Math.min(1, rawI)) * 100;
-  intensityFill.style.width = pct.toFixed(0) + '%';
-}
     // ——— Normalized status: gameover overlay, soundtrack, controls-hud visibility ———
     // Server sends RUNNING | GAME_OVER | ASSIGNING_PLOT | NO_PLOT; client uses playing | gameover | waiting
     if (data.status !== undefined) {
@@ -482,9 +555,12 @@ if (intensityFill) {
       hintEl.classList.add('hidden');
     }
 
-    // ——— Next piece preview (right side under leaderboard). Update whenever we have payload so the piece or empty grid renders. ———
-    var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
-    if (NextPreview) NextPreview.update(data.nextPiece);
+    // ——— Next piece preview (right side under leaderboard). Only update when payload includes next piece so partial payloads (e.g. leaderboard-only) don't clear the preview. Support both camelCase and snake_case. ———
+    var nextPiecePayload = Object.prototype.hasOwnProperty.call(data, 'nextPiece') ? data.nextPiece : (Object.prototype.hasOwnProperty.call(data, 'next_piece') ? data.next_piece : undefined);
+    if (nextPiecePayload !== undefined) {
+      var NextPreview = window.TetrisHudComponents && window.TetrisHudComponents.NextPreview;
+      if (NextPreview) NextPreview.update(nextPiecePayload);
+    }
   }
 
   if (typeof hytopia !== 'undefined' && hytopia.onData) {
@@ -583,13 +659,56 @@ try {
     }
   }
 
+  function onMiniPlayerPointerDown(e) {
+    var target = e.target;
+    var btn = target && target.closest ? target.closest('#btn-miniplayer-pause, #btn-miniplayer-next') : null;
+    if (!btn || btn.disabled) return;
+    if (btn.id === 'btn-miniplayer-pause') {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMiniPlayerPause();
+    } else if (btn.id === 'btn-miniplayer-next') {
+      e.preventDefault();
+      e.stopPropagation();
+      goToNextTrack();
+    }
+  }
+
   document.addEventListener('mousedown', onMutePointerDown, true);
   document.addEventListener('touchstart', onMutePointerDown, { capture: true, passive: false });
+  document.addEventListener('mousedown', onMiniPlayerPointerDown, true);
+  document.addEventListener('touchstart', onMiniPlayerPointerDown, { capture: true, passive: false });
+
+  updateMiniPlayerUI();
 
   document.addEventListener('keydown', function (e) {
-    if (window.JigStackInput && window.JigStackInput.isPaused && window.JigStackInput.isPaused()) return;
-    
+    if (e.target && (e.target.matches('input, textarea'))) return;
     var key = e.key;
+    if (key === 'n' || key === 'N') { goToNextTrack(); e.preventDefault(); return; }
+    if (key === 'p' || key === 'P') { toggleMiniPlayerPause(); e.preventDefault(); return; }
+    if (key === 'm' || key === 'M') {
+      var musicBtn = document.getElementById('btn-mute-music');
+      if (musicBtn) handleMuteButton(musicBtn);
+      e.preventDefault();
+      return;
+    }
+    if (key === 'x' || key === 'X') {
+      var sfxBtn = document.getElementById('btn-mute-sfx');
+      if (sfxBtn) handleMuteButton(sfxBtn);
+      e.preventDefault();
+      return;
+    }
+    if (key === 'j' || key === 'J') {
+      var startBtn = document.getElementById('btn-start-game');
+      var startPanel = document.getElementById('start-game-panel');
+      if (startBtn && startPanel && !startPanel.classList.contains('hidden')) {
+        startBtn.click();
+      }
+      e.preventDefault();
+      return;
+    }
+    if (window.JigStackInput && window.JigStackInput.isPaused && window.JigStackInput.isPaused()) return;
+
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') { send('left'); e.preventDefault(); }
     if (key === 'ArrowRight' || key === 'd' || key === 'D') { send('right'); e.preventDefault(); }
     if (key === 'ArrowUp' || key === 'w' || key === 'W') { send('rotate'); e.preventDefault(); }

@@ -38,10 +38,6 @@
           <div class="stat"><span class="label">Level</span><span id="level" data-prev="1">1</span></div>
           <div class="stat"><sn class="label">Lines</span><span id="lines" data-prev="0">0</span></div>
           <div class="stat"><span class="label">Combo</span><span id="combo" data-prev="0">—</span></div>
-          <div class="intensity" aria-label="Intensity">
-            <div class="intensity-label">Intensity</div>
-            <div class="intensity-bar"><div class="intensity-fill" id="intensity-fill" style="width: 0%"></div></div>
-          </div>
         </div>
       </div>
       <p class="hint hint-server-only hidden" id="hint-server-message"></p>
@@ -53,12 +49,13 @@
         <button type="button" class="btn btn-start-game" id="btn-start-game" data-action="start" aria-label="Start game">Start Game</button>
       </div>
       <div class="next-preview-panel" id="next-preview-container" aria-label="Next piece">
-        <div cls="next-preview-title">NEXT</div>
+        <div class="next-preview-title">NEXT</div>
         <div class="next-preview-grid" id="next-preview-grid"></div>
       </div>
       <div class="controls-panel-right" id="controls-panel-right" aria-label="How to play">
         <div class="controls-panel-title">How to play</div>
         <div class="controls-panel-keys">
+          <span class="controls-key"><kbd>J</kbd> Start game</span>
           <span class="controls-key"><kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> Move</span>
           <span class="controls-key"><kbd>W</kbd> or <kbd>↑</kbd> Rotate</span>
           <span class="controls-key"><kbd>S</kbd> or <kbd>↓</kbd> Soft drop</span>
@@ -66,11 +63,27 @@
           <span class="controls-key"><kbd>R</kbd> Restart</span>
         </div>
       </div>
+      <div class="mini-player-panel" id="mini-player-panel" aria-label="Now playing">
+        <div class="audio-controls-title">Now playing</div>
+        <span id="miniplayer-title" class="miniplayer-title">—</span>
+        <div class="mini-player-controls">
+          <button type="button" class="btn btn-miniplayer" id="btn-miniplayer-pause" aria-label="Pause">Pause</button>
+          <button type="button" class="btn btn-miniplayer" id="btn-miniplayer-next" aria-label="Next song">Next</button>
+        </div>
+        <div class="mini-player-keys">
+          <span class="controls-key"><kbd>N</kbd> Next</span>
+          <span class="controls-key"><kbd>P</kbd> Pause</span>
+        </div>
+      </div>
       <div class="audio-controls-panel" id="audio-controls-panel" aria-label="Sound controls">
         <div class="audio-controls-title">Sound</div>
         <div class="audio-controls-buttons">
-          <button type="button" class="btn btn-mute" id="btn-mute-music" aria-lab music" title="Mute music">🎵 Music</button>
+          <button type="button" class="btn btn-mute" id="btn-mute-music" aria-label="Mute music" title="Mute music">🎵 Music</button>
           <button type="button" class="btn btn-mute" id="btn-mute-sfx" aria-label="Mute SFX" title="Mute sound effects">🔊 SFX</button>
+        </div>
+        <div class="mini-player-keys">
+          <span class="controls-key"><kbd>M</kbd> Music</span>
+          <span class="controls-key"><kbd>X</kbd> SFX</span>
         </div>
       </div>
     </div>

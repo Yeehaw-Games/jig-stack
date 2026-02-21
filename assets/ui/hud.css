@@ -386,6 +386,31 @@ body {
   opacity: 0.7;
 }
 
+.mini-player-panel .btn-miniplayer:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mini-player-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.mini-player-panel .mini-player-keys kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
 .leaderboard-meta {
   display: flex;
   justify-content: space-between;
@@ -698,7 +723,7 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.9);
+  color: #fff;
   margin: 0;
 }
 
@@ -966,6 +991,29 @@ body {
     font-size: 0.9rem;
   }
 
+  .mini-player-panel {
+    padding: 8px 10px;
+  }
+
+  .mini-player-panel .btn-miniplayer {
+    min-height: 38px;
+    font-size: 0.9rem;
+  }
+
+  .miniplayer-title {
+    font-size: 0.85rem;
+  }
+
+  .mini-player-keys {
+    font-size: 0.7rem;
+    gap: 6px 10px;
+  }
+
+  .mini-player-panel .mini-player-keys kbd {
+    padding: 2px 4px;
+    font-size: 0.7rem;
+  }
+
   .game-over-overlay {
     padding: 12px;
   }
@@ -1045,33 +1093,4 @@ html, body {
 :root.mode-mobile body {
   /* We capture gestures ourselves in #mobile-gesture-layer. */
   touch-action: none;
-}
-
-.intensity {
-  width: 100%;
-  padding: 10px 12px 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-}
-.intensity-label {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-bottom: 6px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.intensity-bar {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.10);
-  overflow: hidden;
-}
-.intensity-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #2bff88, #ffd84b, #ff4b2b);
-  box-shadow: 0 0 12px rgba(255, 90, 20, 0.35);
-  transition: width 120ms linear;
-}
-:root.mode-mobile .intensity {
-  padding: 8px 10px 10px;
 }
