@@ -43,7 +43,8 @@
     assetsBase + '/audio/i-live-in-the-world-of-jigg-stack.mp3',
     assetsBase + '/audio/if-you-jigg-ill-jigg.mp3',
     assetsBase + '/audio/stack-jig-jig-jig-jig.mp3',
-    assetsBase + '/audio/mr-jigg-stack.mp3'
+    assetsBase + '/audio/mr-jigg-stack.mp3',
+    assetsBase + '/audio/in-it-for-the-long-run.mp3'
   ] : []);
   if (soundtrackPlaylist.length > 1) {
     for (var i = soundtrackPlaylist.length - 1; i > 0; i--) {

@@ -18,5 +18,6 @@ var soundtrackDisplayNames = {
   'i-live-in-the-world-of-jigg-stack.mp3': "World of Jig Stack",
   'if-you-jigg-ill-jigg.mp3': "If You Jigg I'll Jigg",
   'stack-jig-jig-jig-jig.mp3': "Stack Jig Jig Jig Jig",
-  'mr-jigg-stack.mp3': "Mr. Jigg Stack"
+  'mr-jigg-stack.mp3': "Mr. Jigg Stack",
+  'in-it-for-the-long-run.mp3': "In It for the Long Run"
 };
