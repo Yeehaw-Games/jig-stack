@@ -78,10 +78,13 @@
   var SOUNDTRACK_CROSSFADE_DURATION_MS = 1800;
   var lastStackHeight = 0;
 
-  /** Derive a readable track title from a playlist URL (e.g. never-stop-stackin.mp3 -> "Never Stop Stackin"). */
+  /** Derive a readable track title from a playlist URL. Uses soundtrackDisplayNames when available (see soundtrack-display-names.js). */
   function urlToDisplayName(url) {
     if (!url || typeof url !== 'string') return '—';
-    var name = url.replace(/^.*\//, '').replace(/\.mp3$/i, '').replace(/-/g, ' ');
+    var filename = url.replace(/^.*\//, '');
+    if (typeof soundtrackDisplayNames !== 'undefined' && soundtrackDisplayNames && soundtrackDisplayNames[filename])
+      return soundtrackDisplayNames[filename];
+    var name = filename.replace(/\.mp3$/i, '').replace(/-/g, ' ');
     if (!name) return '—';
     return name.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
@@ -433,6 +436,10 @@
 
   function updateUI(data) {
     const el = function id(name) { return document.getElementById(name); };
+    // Some runtimes wrap server→client payload as { data: payload }; normalize so we always read from the inner payload.
+    if (data && typeof data === 'object' && data.data != null && typeof data.data === 'object') {
+      data = data.data;
+    }
     // Handle line-clear and piece-lock from main payload (single send) or legacy separate messages
     var lineClear = data.lineClearBurst || (data.type === 'lineClearBurst' ? { points: data.points, linesCleared: data.linesCleared, comboCount: data.comboCount } : null);
     if (lineClear && lineClear.linesCleared > 0) {
@@ -544,12 +551,13 @@
       applySoundtrackIntensity();
     }
 
-    // ——— Start Game panel (right-side HUD): visible only when game not started; hide during play and after game over until they click Start New Game. ———
-    // Only show when we explicitly know the game hasn't started (gameStarted === false). If gameStarted is undefined (e.g. in partial payloads), don't change visibility to avoid a brief flash during gameplay.
+    // ——— Start Game panel (right-side HUD): visible when game not started or when game over (so player can start a new round); hidden only during active play. ———
+    // Show when game hasn't started (gameStarted === false) or when status is game over; hide only while a round is running.
     var serverStatus = data.serverStatus !== undefined ? data.serverStatus : data.status;
     var startPanel = document.getElementById('start-game-panel');
     if (startPanel && (data.gameStarted !== undefined || data.serverStatus !== undefined || data.status !== undefined)) {
-      var showStart = data.gameStarted === false && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT';
+      var isGameOver = serverStatus === 'GAME_OVER';
+      var showStart = (data.gameStarted === false || isGameOver) && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT';
       if (showStart) startPanel.classList.remove('hidden'); else startPanel.classList.add('hidden');
     }
 
@@ -571,15 +579,41 @@
         if (NextPreview.ensureGridInited) NextPreview.ensureGridInited();
         NextPreview.update(nextPiecePayload);
       }
+      // Direct DOM update so next piece always displays even if NextPreview component is missing or fails (e.g. load order in Hytopia).
+      renderNextPieceGrid(nextPiecePayload);
     }
 
-    // ——— Next preview panel: visible when game has started or when we have valid next piece data. Only change visibility when this payload has game state or next piece so partial payloads (e.g. leaderboard-only) don't hide the panel. ———
+    // ——— Next preview panel: show whenever we have a plot (not NO_PLOT / ASSIGNING_PLOT) so the next piece can display. ———
     var nextPreviewPanel = document.getElementById('next-preview-container');
-    if (nextPreviewPanel && (data.gameStarted !== undefined || nextPiecePayload !== undefined)) {
-      var hasValidNextPiece = nextPiecePayload && nextPiecePayload.type && nextPiecePayload.matrix;
-      var showNextPreview = hasValidNextPiece || (data.gameStarted === true && serverStatus !== 'NO_PLOT' && serverStatus !== 'ASSIGNING_PLOT');
-      if (showNextPreview) nextPreviewPanel.classList.remove('hidden'); else nextPreviewPanel.classList.add('hidden');
+    if (nextPreviewPanel && (data.gameStarted !== undefined || nextPiecePayload !== undefined || serverStatus !== undefined)) {
+      var hideNextPreview = serverStatus === 'NO_PLOT' || serverStatus === 'ASSIGNING_PLOT';
+      if (hideNextPreview) nextPreviewPanel.classList.add('hidden'); else nextPreviewPanel.classList.remove('hidden');
     }
+  }
+
+  /** Render next piece into #next-preview-grid (4x4). Used when NextPreview component is missing or as primary path. */
+  function renderNextPieceGrid(payload) {
+    var grid = document.getElementById('next-preview-grid');
+    if (!grid) return;
+    var typeToClass = { I: 'block-i', O: 'block-o', T: 'block-t', S: 'block-s', Z: 'block-z', J: 'block-j', L: 'block-l' };
+    var typeKey = (payload && payload.type && typeof payload.type === 'string') ? payload.type.toUpperCase() : 'T';
+    var cls = typeToClass[typeKey] || 'block-t';
+    var matrix = (payload && payload.matrix && Array.isArray(payload.matrix)) ? payload.matrix : null;
+    grid.innerHTML = '';
+    grid.classList.remove('next-preview-updated');
+    for (var row = 0; row < 4; row++) {
+      for (var col = 0; col < 4; col++) {
+        var cell = document.createElement('div');
+        cell.className = 'next-preview-cell';
+        var val = matrix && matrix[row] && matrix[row][col];
+        if (val !== undefined && val !== null && val !== 0 && val !== '0') {
+          cell.classList.add('filled', cls);
+        }
+        grid.appendChild(cell);
+      }
+    }
+    grid.offsetHeight;
+    grid.classList.add('next-preview-updated');
   }
 
   if (typeof hytopia !== 'undefined' && hytopia.onData) {
